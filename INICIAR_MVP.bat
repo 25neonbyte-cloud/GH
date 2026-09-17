@@ -12,7 +12,6 @@ where docker >nul 2>nul
 if errorlevel 1 (
   echo [ERRO] Docker nao foi encontrado neste computador.
   echo Instale o Docker Desktop e execute este arquivo novamente.
-  echo https://www.docker.com/products/docker-desktop/
   echo.
   pause
   exit /b 1
@@ -46,7 +45,7 @@ if errorlevel 1 (
 )
 
 echo [3/4] Aguardando a API ficar disponivel...
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$ok=$false; 1..90 ^| ForEach-Object { try { $r=Invoke-WebRequest -UseBasicParsing 'http://localhost:3001/health' -TimeoutSec 2; if($r.StatusCode -eq 200){$ok=$true; break} } catch {}; Start-Sleep -Seconds 1 }; if(-not $ok){ exit 1 }"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$ok=$false; for($i=0;$i -lt 90;$i++){ try { $r=Invoke-WebRequest -UseBasicParsing 'http://localhost:3001/health' -TimeoutSec 2; if($r.StatusCode -eq 200){$ok=$true; break} } catch {}; Start-Sleep -Seconds 1 }; if(-not $ok){ exit 1 }"
 if errorlevel 1 (
   echo.
   echo [ERRO] Os containers iniciaram, mas a API nao respondeu.
@@ -63,6 +62,8 @@ echo Interface: http://localhost:8080
 echo API:       http://localhost:3001
 echo Usuario:   admin
 echo Senha:     Admin123!
+echo Contas demo: recepcao / enfermagem / escala / gestor
+echo Senha demo: Demo123!
 echo.
 echo O navegador sera aberto automaticamente.
 start "" "http://localhost:8080"
