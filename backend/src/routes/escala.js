@@ -1,0 +1,10 @@
+import { Router } from 'express';
+import { prisma } from '../lib/prisma.js';
+import { authenticate } from '../middleware/auth.js';
+import { checkPermission } from '../middleware/permissions.js';
+import { assert, parseDate } from '../utils/validation.js';
+const router=Router(); router.use(authenticate);
+router.get('/',checkPermission('escala','read'),async(req,res)=>{const {dataInicio,dataFim,profissionalId}=req.query;const where={...(profissionalId&&{profissionalId})};if(dataInicio||dataFim)where.data={...(dataInicio&&{gte:new Date(dataInicio)}),...(dataFim&&{lte:new Date(dataFim)})};const data=await prisma.escala.findMany({where,include:{profissional:true},orderBy:[{data:'asc'},{turno:'asc'}]});res.json({data});});
+router.post('/',checkPermission('escala','write'),async(req,res)=>{const {profissionalId,data,turno}=req.body;const profissional=await prisma.profissional.findUnique({where:{id:profissionalId}});assert(profissional?.ativo,'Profissional não encontrado ou inativo',409);const date=parseDate(data,'Data',{required:true});const existing=await prisma.escala.findUnique({where:{profissionalId_data_turno:{profissionalId,data:date,turno}}});assert(!existing,`Profissional ${profissional.nome} já está escalado para ${turno} nesta data`,409);res.status(201).json(await prisma.escala.create({data:{profissionalId,data:date,turno,updatedBy:req.user.username},include:{profissional:true}}));});
+router.delete('/:id',checkPermission('escala','delete'),async(req,res)=>{await prisma.escala.delete({where:{id:req.params.id}});res.status(204).end();});
+export default router;

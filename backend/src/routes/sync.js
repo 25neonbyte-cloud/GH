@@ -1,0 +1,7 @@
+import { Router } from 'express'; import multer from 'multer'; import fs from 'fs/promises';
+import { authenticate } from '../middleware/auth.js'; import { adminOnly } from '../middleware/permissions.js'; import { previewWorkbook,importWorkbook,exportWorkbook } from '../services/syncService.js'; import { dashboardCache } from '../services/dashboardCache.js';
+const upload=multer({dest:'/tmp/hospital-imports',limits:{fileSize:15*1024*1024}}); const router=Router(); router.use(authenticate,adminOnly);
+router.post('/preview',upload.single('file'),async(req,res)=>{if(!req.file)return res.status(400).json({error:'Arquivo obrigatório'});try{res.json(previewWorkbook(req.file.path));}finally{await fs.unlink(req.file.path).catch(()=>{});}});
+router.post('/importar',upload.single('file'),async(req,res)=>{if(!req.file)return res.status(400).json({error:'Arquivo obrigatório'});try{const result=await importWorkbook(req.file.path,req.file.originalname,req.user.username);dashboardCache.invalidate();res.json(result);}finally{await fs.unlink(req.file.path).catch(()=>{});}});
+router.get('/exportar',async(req,res)=>{const buffer=await exportWorkbook(String(req.query.tipo||'TODOS').toUpperCase());res.setHeader('Content-Type','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');res.setHeader('Content-Disposition','attachment; filename="hospital-export.xlsx"');res.send(buffer);});
+export default router;

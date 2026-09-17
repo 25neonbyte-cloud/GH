@@ -1,0 +1,11 @@
+import { Router } from 'express';
+import { prisma } from '../lib/prisma.js';
+import { authenticate } from '../middleware/auth.js';
+import { checkPermission } from '../middleware/permissions.js';
+import { assert } from '../utils/validation.js';
+const router=Router(); router.use(authenticate);
+router.get('/',checkPermission('profissionais','read'),async(req,res)=>{const {search='',ativo}=req.query;const data=await prisma.profissional.findMany({where:{...(ativo!==undefined&&{ativo:ativo==='true'}),...(search&&{OR:[{nome:{contains:search,mode:'insensitive'}},{registroConselho:{contains:search,mode:'insensitive'}}]})},orderBy:{nome:'asc'}});res.json({data});});
+router.post('/',checkPermission('profissionais','write'),async(req,res)=>{const {nome,registroConselho,cargo}=req.body;assert(nome&&registroConselho&&cargo,'Nome, registro e cargo são obrigatórios');res.status(201).json(await prisma.profissional.create({data:{nome,registroConselho,cargo,updatedBy:req.user.username}}));});
+router.put('/:id',checkPermission('profissionais','write'),async(req,res)=>res.json(await prisma.profissional.update({where:{id:req.params.id},data:{...req.body,updatedBy:req.user.username}})));
+router.delete('/:id',checkPermission('profissionais','delete'),async(req,res)=>{await prisma.profissional.update({where:{id:req.params.id},data:{ativo:false,updatedBy:req.user.username}});res.status(204).end();});
+export default router;

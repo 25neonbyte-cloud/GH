@@ -1,0 +1,11 @@
+import { Router } from 'express';
+import { prisma } from '../lib/prisma.js';
+import { authenticate } from '../middleware/auth.js';
+import { checkPermission } from '../middleware/permissions.js';
+import { assert } from '../utils/validation.js';
+const router=Router(); router.use(authenticate);
+function tipoPorCargo(cargo=''){const c=cargo.toUpperCase();if(c.includes('MED'))return 'MEDICA';if(c.includes('ENFER'))return 'ENFERMAGEM';return 'MULTIPROFISSIONAL';}
+router.get('/paciente/:pacienteId',checkPermission('prontuario','read'),async(req,res)=>{const {tipo}=req.query;const data=await prisma.evolucao.findMany({where:{pacienteId:req.params.pacienteId,...(tipo&&{tipo})},include:{paciente:{select:{nome:true,prontuario:true}}},orderBy:{createdAt:'desc'}});res.json({data});});
+router.post('/paciente/:pacienteId',checkPermission('prontuario','write'),async(req,res)=>{const paciente=await prisma.paciente.findUnique({where:{id:req.params.pacienteId}});assert(paciente,'Paciente não encontrado',404);assert(req.body.observacoes?.trim(),'Observações são obrigatórias');const data=await prisma.evolucao.create({data:{pacienteId:req.params.pacienteId,sinaisVitais:req.body.sinaisVitais||undefined,queixas:req.body.queixas,condutaMedica:req.body.condutaMedica,medicacoes:req.body.medicacoes,observacoes:req.body.observacoes.trim(),tipo:tipoPorCargo(req.user.cargo),criadoPor:req.user.username,criadoPorNome:req.user.nome,criadoPorCargo:req.user.cargo||'NAO_INFORMADO'},include:{paciente:true}});res.status(201).json(data);});
+router.put('/:id',checkPermission('prontuario','write'),async(req,res)=>{const current=await prisma.evolucao.findUnique({where:{id:req.params.id}});assert(current,'Evolução não encontrada',404);assert(req.user.role==='ADMIN'||current.criadoPor===req.user.username,'Você só pode editar suas próprias evoluções',403);assert(req.body.observacoes?.trim(),'Observações são obrigatórias');const allowed={sinaisVitais:req.body.sinaisVitais,queixas:req.body.queixas,condutaMedica:req.body.condutaMedica,medicacoes:req.body.medicacoes,observacoes:req.body.observacoes,updatedBy:req.user.username};res.json(await prisma.evolucao.update({where:{id:req.params.id},data:allowed}));});
+export default router;

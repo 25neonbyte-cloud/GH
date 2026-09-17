@@ -1,0 +1,4 @@
+export function PageTitle({title,subtitle,action}){return <div className="flex items-start justify-between gap-3 mb-5"><div><h1 className="text-2xl font-bold">{title}</h1>{subtitle&&<p className="text-slate-500 mt-1">{subtitle}</p>}</div>{action}</div>}
+export function Status({value}){return <span className={`status ${value}`}>{String(value||'').replace('_',' ')}</span>}
+export function ErrorBox({error}){return error?<div className="mb-4 p-3 rounded-lg bg-red-50 text-red-700 border border-red-200 text-sm">{error}</div>:null}
+export function Modal({open,title,onClose,children}){if(!open)return null;return <div className="fixed inset-0 bg-slate-950/40 z-40 grid place-items-center p-4"><div className="card w-full max-w-2xl max-h-[90vh] overflow-auto"><div className="flex justify-between p-4 border-b"><h2 className="font-bold text-lg">{title}</h2><button onClick={onClose}>✕</button></div><div className="p-4">{children}</div></div></div>}

@@ -1,0 +1,210 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Usuario {
+  id         String   @id @default(uuid())
+  username   String   @unique
+  password   String
+  nome       String
+  cargo      String?
+  role       Role     @default(USER)
+  permissoes Json?
+  ativo      Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("usuarios")
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+model Paciente {
+  id               String       @id @default(uuid())
+  prontuario       String       @unique
+  nome             String
+  cpf              String?      @unique
+  dataNascimento   DateTime
+  sexo             Sexo?
+  nomeAcompanhante String?
+  telefoneContato  String?
+  diagnostico      String?
+  precaucoes       String[]
+  internacoes      Internacao[]
+  evolucoes        Evolucao[]
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  updatedBy        String?
+
+  @@index([nome])
+  @@index([prontuario])
+  @@map("pacientes")
+}
+
+enum Sexo {
+  M
+  F
+  OUTRO
+}
+
+model Leito {
+  id          String          @id @default(uuid())
+  numero      String          @unique
+  andar       Int
+  tipo        TipoLeito
+  status      StatusLeito     @default(LIVRE)
+  observacoes String?
+  internacoes Internacao[]
+  bloqueios   BloqueioLeito[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  updatedBy   String?
+
+  @@index([status])
+  @@index([numero])
+  @@map("leitos")
+}
+
+enum TipoLeito {
+  ENFERMARIA
+  UTI
+  ISOLAMENTO
+  SEMI_INTENSIVO
+}
+
+enum StatusLeito {
+  LIVRE
+  OCUPADO
+  BLOQUEADO
+  MANUTENCAO
+  RESERVADO
+}
+
+model BloqueioLeito {
+  id         String      @id @default(uuid())
+  leitoId    String
+  leito      Leito       @relation(fields: [leitoId], references: [id])
+  tipo       StatusLeito
+  motivo     String
+  dataInicio DateTime
+  dataFim    DateTime?
+  ativo      Boolean     @default(true)
+  createdAt  DateTime    @default(now())
+  createdBy  String
+  liberadoEm DateTime?
+  liberadoBy String?
+
+  @@index([leitoId])
+  @@map("bloqueios_leito")
+}
+
+model Internacao {
+  id                    String           @id @default(uuid())
+  pacienteId            String
+  paciente              Paciente         @relation(fields: [pacienteId], references: [id])
+  leitoId               String
+  leito                  Leito            @relation(fields: [leitoId], references: [id])
+  dataInternacao        DateTime
+  previsaoAlta          DateTime?
+  dataAlta              DateTime?
+  observacoesInternacao String?
+  observacoesAlta       String?
+  status                StatusInternacao @default(ATIVA)
+  createdAt             DateTime         @default(now())
+  createdBy             String
+  dataAltaRegistrada    DateTime?
+  altaBy                String?
+
+  @@index([pacienteId])
+  @@index([leitoId])
+  @@index([status])
+  @@map("internacoes")
+}
+
+enum StatusInternacao {
+  ATIVA
+  FINALIZADA
+}
+
+model Evolucao {
+  id             String       @id @default(uuid())
+  pacienteId     String
+  paciente       Paciente     @relation(fields: [pacienteId], references: [id])
+  sinaisVitais   Json?
+  queixas        String?
+  condutaMedica  String?
+  medicacoes     String?
+  observacoes    String
+  tipo           TipoEvolucao @default(ENFERMAGEM)
+  criadoPor      String
+  criadoPorNome  String
+  criadoPorCargo String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  updatedBy      String?
+
+  @@index([pacienteId])
+  @@index([createdAt])
+  @@map("evolucoes")
+}
+
+enum TipoEvolucao {
+  ENFERMAGEM
+  MEDICA
+  MULTIPROFISSIONAL
+}
+
+model Profissional {
+  id               String   @id @default(uuid())
+  nome             String
+  registroConselho String   @unique
+  cargo            String
+  ativo            Boolean  @default(true)
+  escalas          Escala[]
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  updatedBy        String?
+
+  @@index([nome])
+  @@map("profissionais")
+}
+
+model Escala {
+  id             String       @id @default(uuid())
+  profissionalId String
+  profissional   Profissional @relation(fields: [profissionalId], references: [id])
+  data           DateTime
+  turno          Turno
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  updatedBy      String?
+
+  @@unique([profissionalId, data, turno])
+  @@index([data])
+  @@map("escalas")
+}
+
+enum Turno {
+  MANHA
+  TARDE
+  NOITE
+}
+
+model LogImportacao {
+  id             String   @id @default(uuid())
+  tipo           String
+  arquivo        String
+  resultado      Json
+  importadoPor   String
+  dataImportacao DateTime @default(now())
+
+  @@map("logs_importacao")
+}
