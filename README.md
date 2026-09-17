@@ -2,6 +2,23 @@
 
 Implementação do MVP baseada na **Especificação Revisada v2.0**. O sistema substitui a planilha como fonte operacional: a interface web recebe os inputs mínimos, o backend centraliza as regras e o PostgreSQL é a fonte de verdade. Grid, Dashboard e Modo TV são outputs derivados.
 
+## Início rápido no Windows — recomendado para validação
+
+**Não abra `frontend/index.html` diretamente.** O frontend é React/Vite e depende da API e do PostgreSQL.
+
+1. Instale e abra o **Docker Desktop**.
+2. Baixe/clone esta branch (`mvp/hospital-prjt-v1`).
+3. Na raiz do projeto, dê duplo clique em **`INICIAR_MVP.bat`**.
+4. Aguarde a confirmação `MVP operacional`.
+5. O navegador abrirá automaticamente em `http://localhost:8080`.
+
+Login inicial de desenvolvimento:
+
+- usuário: `admin`
+- senha: `Admin123!`
+
+Para desligar, execute **`PARAR_MVP.bat`**. Os dados do PostgreSQL permanecem preservados no volume Docker.
+
 ## Entregue
 
 - Autenticação JWT e perfis/permissões granulares
@@ -126,4 +143,3 @@ A documentação revisada menciona transferência de paciente como alternativa a
 - Regra de escala corrigida
 - Preview/importação de Excel e exportação
 - Backup manual, automático, download e restore
-
