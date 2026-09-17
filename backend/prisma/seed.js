@@ -43,7 +43,7 @@ async function main() {
 
   console.log('Carregando cenário demonstrativo do Hospital PRJT...');
 
-  // 105 leitos operacionais: 95 de internação + 10 UTI.
+  // Cenário baseado na capacidade informada: 95 leitos de internação + 10 UTI = 105 leitos.
   const bedSpecs = [];
   for (let i = 0; i < 95; i++) {
     let numero;
@@ -72,7 +72,7 @@ async function main() {
   for (let i = 0; i < 120; i++) {
     const prontuario = String(700001 + i);
     const isolamento = i >= 68 && i < 72;
-    const p = await prisma.paciente.upsert({
+    patients.push(await prisma.paciente.upsert({
       where: { prontuario },
       update: {},
       create: {
@@ -87,8 +87,7 @@ async function main() {
         precaucoes: isolamento ? ['ISOLAMENTO'] : (i % 17 === 0 ? ['ALERGIA_LATEX'] : []),
         updatedBy: 'seed-demo',
       },
-    });
-    patients.push(p);
+    }));
   }
 
   const allBeds = await prisma.leito.findMany({ where: { numero: { in: bedSpecs.map(b => b.numero) } } });
@@ -121,6 +120,7 @@ async function main() {
     await prisma.leito.update({ where: { id: leito.id }, data: { status: 'OCUPADO', updatedBy: 'seed-demo' } });
   }
 
+  // Histórico de altas para alimentar dashboard e navegação histórica.
   for (let i = 84; i < 104; i++) {
     const paciente = patients[i];
     const leito = bedByNumber.get(bedSpecs[(i - 84) % 20].numero);
@@ -146,10 +146,12 @@ async function main() {
     }
   }
 
+  // Estados operacionais em leitos livres: manutenção, bloqueio e reserva.
+  const freeSemi = bedSpecs.filter(b => b.tipo === 'SEMI_INTENSIVO').slice(4, 7);
   const unavailable = [
-    { numero: bedSpecs[90].numero, tipo: 'MANUTENCAO', motivo: 'Manutenção preventiva simulada' },
-    { numero: bedSpecs[91].numero, tipo: 'BLOQUEADO', motivo: 'Higienização terminal simulada' },
-    { numero: bedSpecs[92].numero, tipo: 'RESERVADO', motivo: 'Reserva para transferência interna simulada' },
+    { numero: freeSemi[0].numero, tipo: 'MANUTENCAO', motivo: 'Manutenção preventiva simulada' },
+    { numero: freeSemi[1].numero, tipo: 'BLOQUEADO', motivo: 'Higienização terminal simulada' },
+    { numero: freeSemi[2].numero, tipo: 'RESERVADO', motivo: 'Reserva para transferência interna simulada' },
   ];
   for (const u of unavailable) {
     const leito = bedByNumber.get(u.numero);
@@ -158,6 +160,7 @@ async function main() {
     if (!exists) await prisma.bloqueioLeito.create({ data: { leitoId: leito.id, tipo: u.tipo, motivo: u.motivo, dataInicio: now, ativo: true, createdBy: 'seed-demo' } });
   }
 
+  // Corpo multidisciplinar fictício para demonstrar cadastro e escala.
   const professionalSpecs = [];
   const medicalSpecialties = ['EMERGENCISTA','CIRURGIA GERAL','ORTOPEDIA','MEDICINA INTENSIVA','PEDIATRIA','CARDIOLOGIA','ANESTESIOLOGIA','CLÍNICA MÉDICA','NEUROLOGIA','RADIOLOGIA','INFECTOLOGIA','GASTROENTEROLOGIA'];
   for (let i = 0; i < 18; i++) professionalSpecs.push({ nome: nomePessoa(200 + i, 2), registro: `CRM-GO ${10001 + i}`, cargo: `MÉDICO | ${medicalSpecialties[i % medicalSpecialties.length]}` });
@@ -178,6 +181,7 @@ async function main() {
     }));
   }
 
+  // Escala demonstrativa do mês corrente.
   const y = now.getUTCFullYear();
   const m = now.getUTCMonth();
   const turnos = ['MANHA', 'TARDE', 'NOITE'];
@@ -193,6 +197,7 @@ async function main() {
     }
   }
 
+  // Perfis prontos para demonstrar restrições de acesso.
   await upsertUser({ username: 'recepcao', password: demoPassword, nome: 'Recepção Demo', cargo: 'RECEPÇÃO', permissoes: { pacientes: ['read','write'], leitos: ['read'], internacoes: ['read','write'], dashboard: ['read'] } });
   await upsertUser({ username: 'enfermagem', password: demoPassword, nome: 'Enfermagem Demo', cargo: 'ENFERMEIRO', permissoes: { pacientes: ['read'], leitos: ['read'], internacoes: ['read'], prontuario: ['read','write'], escala: ['read'], dashboard: ['read'] } });
   await upsertUser({ username: 'escala', password: demoPassword, nome: 'Gestão de Escala Demo', cargo: 'ADMINISTRATIVO', permissoes: { profissionais: ['read','write','delete'], escala: ['read','write','delete'], dashboard: ['read'] } });
@@ -203,7 +208,7 @@ async function main() {
       tipo: DEMO_MARKER,
       arquivo: 'seed interno demonstrativo',
       importadoPor: 'seed-demo',
-      resultado: { leitos: 105, pacientes: 120, internacoesAtivas: 84, altasHistoricas: 20, profissionais: professionals.length, observacao: 'Dados integralmente fictícios para apresentação.' },
+      resultado: { leitos:105, pacientes:120, internacoesAtivas:84, altasHistoricas:20, profissionais:professionals.length, observacao:'Dados integralmente fictícios para apresentação.' },
     },
   });
 
