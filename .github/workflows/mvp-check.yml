@@ -9,6 +9,25 @@ on:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: hospital
+          POSTGRES_USER: hospital
+          POSTGRES_PASSWORD: hospital
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U hospital -d hospital"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://hospital:hospital@localhost:5432/hospital?schema=public
+      JWT_SECRET: ci-secret-hospital-prjt
+      TV_PASSWORD: troque-esta-senha
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -23,6 +42,18 @@ jobs:
 
       - name: Backend tests
         run: npm --prefix backend test
+
+      - name: Database migration and demo seed
+        working-directory: backend
+        run: |
+          npx prisma generate
+          npx prisma migrate deploy
+          node prisma/seed.js
+
+      - name: Validate demo dataset
+        working-directory: backend
+        run: |
+          node --input-type=module -e 'import { PrismaClient } from "@prisma/client"; const p=new PrismaClient(); const [beds,patients,active,professionals,schedules]=await Promise.all([p.leito.count(),p.paciente.count(),p.internacao.count({where:{status:"ATIVA"}}),p.profissional.count(),p.escala.count()]); console.log({beds,patients,active,professionals,schedules}); if(beds<105||patients<120||active<84||professionals<70||schedules<300) process.exitCode=1; await p.$disconnect();'
 
       - name: Frontend dependencies
         run: npm --prefix frontend install --no-audit --no-fund
