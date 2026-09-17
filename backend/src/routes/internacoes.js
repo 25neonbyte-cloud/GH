@@ -56,6 +56,42 @@ router.post('/', checkPermission('internacoes', 'write'), async (req, res) => {
   }
 });
 
+router.post('/:id/transferir', checkPermission('internacoes', 'write'), async (req, res) => {
+  const { novoLeitoId, motivo = '' } = req.body;
+  assert(novoLeitoId, 'Novo leito é obrigatório');
+
+  const result = await prisma.$transaction(async tx => {
+    const current = await tx.internacao.findUnique({ where: { id: req.params.id }, include: { paciente: true, leito: true } });
+    assert(current, 'Internação não encontrada', 404);
+    assert(current.status === 'ATIVA', 'Somente internações ativas podem ser transferidas', 409);
+    assert(current.leitoId !== novoLeitoId, 'Selecione um leito diferente do atual', 409);
+
+    await tx.$queryRaw`SELECT "id" FROM "leitos" WHERE "id" IN (${current.leitoId}, ${novoLeitoId}) FOR UPDATE`;
+    const novoLeito = await tx.leito.findUnique({ where: { id: novoLeitoId } });
+    assert(novoLeito, 'Novo leito não encontrado', 404);
+    assert(novoLeito.status === 'LIVRE', `Leito ${novoLeito.numero} não está disponível (Status: ${novoLeito.status})`, 409);
+    if (current.paciente.precaucoes.includes('ISOLAMENTO')) {
+      assert(novoLeito.tipo === 'ISOLAMENTO', 'Paciente com precaução de isolamento deve permanecer em leito de isolamento', 409);
+    }
+
+    const stamp = new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+    const registro = `[TRANSFERÊNCIA ${stamp}] ${current.leito.numero} → ${novoLeito.numero}${motivo.trim() ? ` · ${motivo.trim()}` : ''}`;
+    const observacoesInternacao = [current.observacoesInternacao, registro].filter(Boolean).join('\n');
+
+    const updated = await tx.internacao.update({
+      where: { id: current.id },
+      data: { leitoId: novoLeito.id, observacoesInternacao },
+      include: { paciente: true, leito: true },
+    });
+    await tx.leito.update({ where: { id: current.leitoId }, data: { status: 'LIVRE', updatedBy: req.user.username } });
+    await tx.leito.update({ where: { id: novoLeito.id }, data: { status: 'OCUPADO', updatedBy: req.user.username } });
+    return updated;
+  }, { isolationLevel: 'Serializable' });
+
+  dashboardCache.invalidate();
+  res.json({ ...result, los: calcularLOS(result.dataInternacao) });
+});
+
 router.put('/:id/finalizar', checkPermission('internacoes', 'write'), async (req, res) => {
   const alta = parseDate(req.body.dataAlta || new Date(), 'Data de alta', { required: true, allowFuture: false });
   const result = await prisma.$transaction(async tx => {
