@@ -18,6 +18,7 @@ model Usuario {
   ativo      Boolean  @default(true)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+  profissional Profissional?
 
   @@map("usuarios")
 }
@@ -168,6 +169,8 @@ model Profissional {
   registroConselho String   @unique
   cargo            String
   ativo            Boolean  @default(true)
+  usuarioId        String?  @unique
+  usuario          Usuario? @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
   escalas          Escala[]
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
