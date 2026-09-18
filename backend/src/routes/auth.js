@@ -1,11 +1,10 @@
-import { Router } from 'express';
-import bcrypt from 'bcrypt';
+import { createRouter } from '../utils/asyncRouter.js'; import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../lib/prisma.js';
 import { authenticate } from '../middleware/auth.js';
 import { assert } from '../utils/validation.js';
 
-const router = Router();
+const router = createRouter();
 const signUser = user => jwt.sign({ sub: user.id, username: user.username, role: user.role }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '24h' });
 
 router.post('/login', async (req, res) => {
