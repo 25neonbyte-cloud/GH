@@ -27,7 +27,6 @@ export default function Internacoes() {
       setError('');
     } catch (e) {
       setError(errMsg(e));
-      setList([]);
     }
   };
 
@@ -109,14 +108,14 @@ export default function Internacoes() {
     <div className="card p-4 mb-4 flex flex-col lg:flex-row gap-3 lg:items-center lg:justify-between">
       <div className="flex gap-2">
         <button className={`btn ${status === 'ATIVA' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setStatus('ATIVA')}>Ativas</button>
-        <button className={`btn ${status === 'FINALIZADA' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setStatus('FINALIZADA')}>Histórico de altas</button>
+        <button className={`btn ${status === 'FINALIZADA' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setStatus('FINALIZADA')}>Histórico de internações</button>
       </div>
       <input className="input lg:max-w-md" placeholder="Buscar paciente, prontuário ou leito" value={q} onChange={e => setQ(e.target.value)}/>
     </div>
 
     <div className="grid sm:grid-cols-3 gap-3 mb-4">
       <div className="card p-4"><div className="text-xs text-slate-500">Exibindo</div><div className="text-2xl font-bold">{filtered.length}</div></div>
-      <div className="card p-4"><div className="text-xs text-slate-500">Situação</div><div className="text-lg font-bold">{status === 'ATIVA' ? 'Internações ativas' : 'Altas registradas'}</div></div>
+      <div className="card p-4"><div className="text-xs text-slate-500">Situação</div><div className="text-lg font-bold">{status === 'ATIVA' ? 'Internações ativas' : 'Histórico de internações'}</div></div>
       <div className="card p-4"><div className="text-xs text-slate-500">Atualização</div><div className="text-lg font-bold">Tempo real</div></div>
     </div>
 
