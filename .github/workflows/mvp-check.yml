@@ -53,7 +53,22 @@ jobs:
       - name: Validate demo dataset
         working-directory: backend
         run: |
-          node --input-type=module -e 'import { PrismaClient } from "@prisma/client"; const p=new PrismaClient(); const [beds,patients,active,professionals,schedules]=await Promise.all([p.leito.count(),p.paciente.count(),p.internacao.count({where:{status:"ATIVA"}}),p.profissional.count(),p.escala.count()]); console.log({beds,patients,active,professionals,schedules}); if(beds<105||patients<120||active<84||professionals<70||schedules<300) process.exitCode=1; await p.$disconnect();'
+          node --input-type=module -e 'import { PrismaClient } from "@prisma/client"; const p=new PrismaClient(); const [beds,patients,active,professionals,schedules,evolutions,linked]=await Promise.all([p.leito.count(),p.paciente.count(),p.internacao.count({where:{status:"ATIVA"}}),p.profissional.count(),p.escala.count(),p.evolucao.count(),p.profissional.count({where:{usuarioId:{not:null}}})]); console.log({beds,patients,active,professionals,schedules,evolutions,linked}); if(beds<105||patients<120||active<84||professionals<70||schedules<300||evolutions<80||linked<4) process.exitCode=1; await p.$disconnect();'
+
+      - name: Start API
+        working-directory: backend
+        run: |
+          node src/server.js >/tmp/hospital-api.log 2>&1 &
+          for i in {1..30}; do
+            if curl -fsS http://localhost:3001/health >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/hospital-api.log
+          exit 1
+
+      - name: API resilience after expected errors
+        working-directory: backend
+        run: node tests/api-resilience.mjs
 
       - name: Frontend dependencies
         run: npm --prefix frontend install --no-audit --no-fund
