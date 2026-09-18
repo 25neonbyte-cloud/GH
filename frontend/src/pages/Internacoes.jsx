@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api, errMsg } from '../services/api';
 import { ErrorBox, Modal, PageTitle, Status } from '../components/Common';
 import { useAuth } from '../context/AuthContext';
@@ -124,7 +125,7 @@ export default function Internacoes() {
         <thead><tr><th>Paciente</th><th>Prontuário</th><th>Leito</th><th>Entrada</th><th>{status === 'ATIVA' ? 'Previsão de alta' : 'Alta'}</th><th>LOS</th><th>Status</th><th>Ações</th></tr></thead>
         <tbody>
           {filtered.map(i => <tr key={i.id}>
-            <td className="font-semibold">{i.paciente?.nome || 'Paciente'}</td>
+            <td className="font-semibold"><Link className="text-blue-700 hover:underline" to={`/pacientes/${i.paciente?.id}`}>{i.paciente?.nome || 'Paciente'}</Link></td>
             <td>{i.paciente?.prontuario || '—'}</td>
             <td>{i.leito?.numero || '—'} · {i.leito?.tipo || '—'}</td>
             <td>{fmt(i.dataInternacao)}</td>
