@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api, errMsg } from '../services/api';
 import { ErrorBox, Modal, PageTitle } from '../components/Common';
 import { useAuth } from '../context/AuthContext';
@@ -70,7 +71,7 @@ export default function Pacientes() {
       <table className="table">
         <thead><tr><th>Prontuário</th><th>Nome</th><th>Nascimento</th><th>Diagnóstico</th><th>Internação</th><th>Ações</th></tr></thead>
         <tbody>{list.map(p => <tr key={p.id}>
-          <td>{p.prontuario}</td><td className="font-semibold">{p.nome}</td><td>{p.dataNascimento ? new Date(p.dataNascimento).toLocaleDateString('pt-BR') : '—'}</td><td>{p.diagnostico || '—'}</td><td>{p.internacoes?.[0] ? <span className="font-semibold text-blue-700">Leito {p.internacoes[0].leito?.numero}</span> : '—'}</td>
+          <td>{p.prontuario}</td><td className="font-semibold"><Link className="text-blue-700 hover:underline" to={`/pacientes/${p.id}`}>{p.nome}</Link></td><td>{p.dataNascimento ? new Date(p.dataNascimento).toLocaleDateString('pt-BR') : '—'}</td><td>{p.diagnostico || '—'}</td><td>{p.internacoes?.[0] ? <span className="font-semibold text-blue-700">Leito {p.internacoes[0].leito?.numero}</span> : '—'}</td>
           <td><div className="flex gap-2">{can('pacientes','write') && <button className="text-blue-700 font-semibold text-sm" onClick={() => editar(p)}>Editar</button>}{can('pacientes','delete') && <button className="text-red-700 font-semibold text-sm" onClick={() => remove(p)}>Excluir</button>}</div></td>
         </tr>)}</tbody>
       </table>
