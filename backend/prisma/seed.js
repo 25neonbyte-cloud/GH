@@ -5,6 +5,7 @@ const prisma = new PrismaClient();
 const adminPassword = process.env.SEED_ADMIN_PASSWORD || 'Admin123!';
 const demoPassword = process.env.SEED_DEMO_PASSWORD || 'Demo123!';
 const DEMO_MARKER = 'DEMO_MVP_COMERCIAL_V3';
+const PREVIOUS_DEMO_MARKER = 'DEMO_MVP_COMERCIAL_V2';
 
 const nomes = ['Ana','Bruno','Carla','Daniel','Eduarda','Felipe','Gabriela','Henrique','Isabela','João','Karina','Lucas','Mariana','Nicolas','Olívia','Paulo','Renata','Samuel','Tatiana','Vinícius'];
 const sobrenomes = ['Almeida','Barbosa','Cardoso','Dias','Ferreira','Gomes','Lima','Martins','Mendes','Moreira','Nascimento','Oliveira','Pereira','Ribeiro','Rocha','Rodrigues','Santos','Silva','Souza','Teixeira'];
@@ -32,16 +33,108 @@ async function upsertUser({ username, password, nome, cargo, role = 'USER', perm
   });
 }
 
+async function repairBedStatuses() {
+  const beds = await prisma.leito.findMany({
+    include: {
+      internacoes: { where: { status: 'ATIVA' }, select: { id: true }, take: 1 },
+      bloqueios: { where: { ativo: true }, orderBy: { createdAt: 'desc' }, select: { tipo: true }, take: 1 },
+    },
+  });
+  for (const bed of beds) {
+    const desired = bed.internacoes.length ? 'OCUPADO' : (bed.bloqueios[0]?.tipo || bed.status);
+    if (desired !== bed.status) {
+      await prisma.leito.update({ where: { id: bed.id }, data: { status: desired, updatedBy: 'seed-demo-repair' } });
+    }
+  }
+}
+
+async function addDemoEvolutions(now = new Date()) {
+  const patients = await prisma.paciente.findMany({
+    where: { prontuario: { startsWith: '700' } },
+    orderBy: { prontuario: 'asc' },
+    take: 40,
+  });
+  for (let i = 0; i < patients.length; i++) {
+    const paciente = patients[i];
+    const existing = await prisma.evolucao.count({ where: { pacienteId: paciente.id, criadoPor: { startsWith: 'seed-demo' } } });
+    if (existing) continue;
+    for (let n = 0; n < 2; n++) {
+      await prisma.evolucao.create({
+        data: {
+          pacienteId: paciente.id,
+          sinaisVitais: { pa: `${110 + (i % 25)}/${70 + (i % 15)}`, fc: 72 + (i % 24), temp: Number((36.2 + ((i + n) % 8) / 10).toFixed(1)), spo2: 94 + (i % 6) },
+          queixas: n === 0 ? 'Avaliação clínica de rotina no cenário demonstrativo.' : 'Paciente refere evolução do quadro nas últimas horas.',
+          condutaMedica: n === 1 ? 'Manter acompanhamento e reavaliar conforme evolução clínica.' : null,
+          medicacoes: i % 3 === 0 ? 'Medicações conforme prescrição simulada.' : null,
+          observacoes: n === 0 ? 'Paciente avaliado, sinais vitais registrados e cuidados mantidos.' : 'Evolução fictícia para demonstração do prontuário e histórico longitudinal.',
+          tipo: n === 0 ? 'ENFERMAGEM' : 'MEDICA',
+          criadoPor: `seed-demo-${n === 0 ? 'enfermagem' : 'medico'}`,
+          criadoPorNome: n === 0 ? 'Equipe de Enfermagem Demo' : 'Médico Plantonista Demo',
+          criadoPorCargo: n === 0 ? 'ENFERMEIRO' : 'MÉDICO | CLÍNICA MÉDICA',
+          createdAt: addDays(now, -n),
+        },
+      });
+    }
+  }
+}
+
+async function linkDemoUsers() {
+  const recepcaoUser = await upsertUser({ username: 'recepcao', password: demoPassword, nome: 'Recepção Demo', cargo: 'RECEPÇÃO', permissoes: { pacientes: ['read','write'], leitos: ['read'], internacoes: ['read','write'], dashboard: ['read'], sync: ['read'] } });
+  const enfermagemUser = await upsertUser({ username: 'enfermagem', password: demoPassword, nome: 'Enfermagem Demo', cargo: 'ENFERMEIRO', permissoes: { pacientes: ['read'], leitos: ['read'], internacoes: ['read'], prontuario: ['read','write'], escala: ['read'], dashboard: ['read'] } });
+  const escalaUser = await upsertUser({ username: 'escala', password: demoPassword, nome: 'Gestão de Escala Demo', cargo: 'ADMINISTRATIVO', permissoes: { profissionais: ['read','write','delete'], escala: ['read','write','delete'], dashboard: ['read'] } });
+  const gestorUser = await upsertUser({ username: 'gestor', password: demoPassword, nome: 'Gestor Demo', cargo: 'GESTÃO', permissoes: { pacientes: ['read','write'], leitos: ['read','write'], internacoes: ['read','write'], prontuario: ['read'], profissionais: ['read','write'], escala: ['read','write','delete'], dashboard: ['read'], sync: ['read','write'] } });
+
+  const admins = await prisma.profissional.findMany({ where: { cargo: 'ADMINISTRATIVO', updatedBy: { startsWith: 'seed-demo' } }, orderBy: { registroConselho: 'asc' }, take: 3 });
+  const nurse = await prisma.profissional.findFirst({ where: { cargo: 'ENFERMEIRO', updatedBy: { startsWith: 'seed-demo' } }, orderBy: { registroConselho: 'asc' } });
+  const targets = [[enfermagemUser,nurse],[escalaUser,admins[0]],[gestorUser,admins[1]],[recepcaoUser,admins[2]]];
+
+  for (const [user, professional] of targets) {
+    if (!professional) continue;
+    const alreadyLinked = await prisma.profissional.findFirst({ where: { usuarioId: user.id } });
+    if (!alreadyLinked && !professional.usuarioId) {
+      await prisma.profissional.update({ where: { id: professional.id }, data: { usuarioId: user.id } });
+    }
+  }
+}
+
+async function markDemoV3(source) {
+  const existing = await prisma.logImportacao.findFirst({ where: { tipo: DEMO_MARKER } });
+  if (existing) return;
+  await prisma.logImportacao.create({
+    data: {
+      tipo: DEMO_MARKER,
+      arquivo: 'seed interno demonstrativo',
+      importadoPor: 'seed-demo',
+      resultado: { versao: 3, source, observacao: 'Base demonstrativa atualizada de forma idempotente.' },
+    },
+  });
+}
+
 async function main() {
   await upsertUser({ username: 'admin', password: adminPassword, nome: 'Administrador', cargo: 'ADMINISTRATIVO', role: 'ADMIN', permissoes: {} });
 
   const marker = await prisma.logImportacao.findFirst({ where: { tipo: DEMO_MARKER } });
   if (marker) {
-    console.log('Base demonstrativa já carregada. Seed preservado.');
+    console.log('Base demonstrativa V3 já carregada. Seed preservado.');
     return;
   }
 
-  console.log('Carregando cenário demonstrativo do Hospital PRJT...');
+  const previousMarker = await prisma.logImportacao.findFirst({ where: { tipo: PREVIOUS_DEMO_MARKER } });
+  const existingDemoPatients = await prisma.paciente.count({ where: { prontuario: { startsWith: '700' } } });
+  const existingDemoBeds = await prisma.leito.count();
+
+  if (previousMarker || (existingDemoPatients >= 50 && existingDemoBeds >= 50)) {
+    console.log('Atualizando base demonstrativa existente para V3 sem recriar internações...');
+    await repairBedStatuses();
+    await addDemoEvolutions();
+    await linkDemoUsers();
+    await repairBedStatuses();
+    await markDemoV3(previousMarker ? 'upgrade-v2' : 'recovery-existing-demo');
+    console.log('Base demonstrativa atualizada para V3 e consistência dos leitos restaurada.');
+    return;
+  }
+
+  console.log('Carregando cenário demonstrativo V3 do Hospital PRJT em banco novo...');
 
   // Cenário baseado na capacidade informada: 95 leitos de internação + 10 UTI = 105 leitos.
   const bedSpecs = [];
@@ -62,7 +155,7 @@ async function main() {
   for (const b of bedSpecs) {
     await prisma.leito.upsert({
       where: { numero: b.numero },
-      update: { andar: b.andar, tipo: b.tipo, observacoes: b.observacoes, status: 'LIVRE', updatedBy: 'seed-demo' },
+      update: { andar: b.andar, tipo: b.tipo, observacoes: b.observacoes, updatedBy: 'seed-demo' },
       create: { ...b, status: 'LIVRE', updatedBy: 'seed-demo' },
     });
   }
@@ -103,8 +196,11 @@ async function main() {
   for (let i = 0; i < 84; i++) {
     const paciente = patients[i];
     const leito = bedByNumber.get(activeBedSpecs[i].numero);
-    const existing = await prisma.internacao.findFirst({ where: { pacienteId: paciente.id, status: 'ATIVA' } });
-    if (!existing) {
+    const [existingByPatient, existingByBed] = await Promise.all([
+      prisma.internacao.findFirst({ where: { pacienteId: paciente.id, status: 'ATIVA' } }),
+      prisma.internacao.findFirst({ where: { leitoId: leito.id, status: 'ATIVA' } }),
+    ]);
+    if (!existingByPatient && !existingByBed) {
       await prisma.internacao.create({
         data: {
           pacienteId: paciente.id,
@@ -116,8 +212,10 @@ async function main() {
           createdBy: 'seed-demo',
         },
       });
+      await prisma.leito.update({ where: { id: leito.id }, data: { status: 'OCUPADO', updatedBy: 'seed-demo' } });
+    } else if (existingByBed) {
+      await prisma.leito.update({ where: { id: leito.id }, data: { status: 'OCUPADO', updatedBy: 'seed-demo' } });
     }
-    await prisma.leito.update({ where: { id: leito.id }, data: { status: 'OCUPADO', updatedBy: 'seed-demo' } });
   }
 
   // Histórico de altas para alimentar dashboard e navegação histórica.
@@ -146,30 +244,7 @@ async function main() {
     }
   }
 
-  // Evoluções fictícias para que a ficha do paciente e o prontuário tenham histórico demonstrável.
-  for (let i = 0; i < 40; i++) {
-    const paciente = patients[i];
-    const existing = await prisma.evolucao.count({ where:{ pacienteId:paciente.id, criadoPor:{startsWith:'seed-demo'} } });
-    if (!existing) {
-      for (let n = 0; n < 2; n++) {
-        await prisma.evolucao.create({
-          data:{
-            pacienteId:paciente.id,
-            sinaisVitais:{ pa:`${110 + (i % 25)}/${70 + (i % 15)}`, fc:72 + (i % 24), temp:Number((36.2 + ((i+n)%8)/10).toFixed(1)), spo2:94 + (i % 6) },
-            queixas:n===0 ? 'Avaliação clínica de rotina no cenário demonstrativo.' : 'Paciente refere evolução do quadro nas últimas horas.',
-            condutaMedica:n===1 ? 'Manter acompanhamento e reavaliar conforme evolução clínica.' : null,
-            medicacoes:i % 3 === 0 ? 'Medicações conforme prescrição simulada.' : null,
-            observacoes:n===0 ? 'Paciente avaliado, sinais vitais registrados e cuidados mantidos.' : 'Evolução fictícia para demonstração do prontuário e histórico longitudinal.',
-            tipo:n===0 ? 'ENFERMAGEM' : 'MEDICA',
-            criadoPor:`seed-demo-${n===0?'enfermagem':'medico'}`,
-            criadoPorNome:n===0 ? 'Equipe de Enfermagem Demo' : 'Médico Plantonista Demo',
-            criadoPorCargo:n===0 ? 'ENFERMEIRO' : 'MÉDICO | CLÍNICA MÉDICA',
-            createdAt:addDays(now,-n),
-          },
-        });
-      }
-    }
-  }
+  await addDemoEvolutions(now);
 
   // Estados operacionais em leitos livres: manutenção, bloqueio e reserva.
   const freeSemi = bedSpecs.filter(b => b.tipo === 'SEMI_INTENSIVO').slice(4, 7);
@@ -222,29 +297,11 @@ async function main() {
     }
   }
 
-  // Perfis prontos para demonstrar restrições de acesso e vínculo profissional ↔ usuário.
-  const recepcaoUser = await upsertUser({ username: 'recepcao', password: demoPassword, nome: 'Recepção Demo', cargo: 'RECEPÇÃO', permissoes: { pacientes: ['read','write'], leitos: ['read'], internacoes: ['read','write'], dashboard: ['read'], sync:['read'] } });
-  const enfermagemUser = await upsertUser({ username: 'enfermagem', password: demoPassword, nome: 'Enfermagem Demo', cargo: 'ENFERMEIRO', permissoes: { pacientes: ['read'], leitos: ['read'], internacoes: ['read'], prontuario: ['read','write'], escala: ['read'], dashboard: ['read'] } });
-  const escalaUser = await upsertUser({ username: 'escala', password: demoPassword, nome: 'Gestão de Escala Demo', cargo: 'ADMINISTRATIVO', permissoes: { profissionais: ['read','write','delete'], escala: ['read','write','delete'], dashboard: ['read'] } });
-  const gestorUser = await upsertUser({ username: 'gestor', password: demoPassword, nome: 'Gestor Demo', cargo: 'GESTÃO', permissoes: { pacientes: ['read','write'], leitos: ['read','write'], internacoes: ['read','write'], prontuario: ['read'], profissionais: ['read','write'], escala: ['read','write','delete'], dashboard: ['read'], sync:['read','write'] } });
+  await linkDemoUsers();
+  await repairBedStatuses();
+  await markDemoV3('fresh-seed');
 
-  const enfermeiroDemo = professionals.find(p => p.cargo === 'ENFERMEIRO');
-  const administrativosDemo = professionals.filter(p => p.cargo === 'ADMINISTRATIVO');
-  if (enfermeiroDemo) await prisma.profissional.update({ where:{id:enfermeiroDemo.id}, data:{usuarioId:enfermagemUser.id} });
-  if (administrativosDemo[0]) await prisma.profissional.update({ where:{id:administrativosDemo[0].id}, data:{usuarioId:escalaUser.id} });
-  if (administrativosDemo[1]) await prisma.profissional.update({ where:{id:administrativosDemo[1].id}, data:{usuarioId:gestorUser.id} });
-  if (administrativosDemo[2]) await prisma.profissional.update({ where:{id:administrativosDemo[2].id}, data:{usuarioId:recepcaoUser.id} });
-
-  await prisma.logImportacao.create({
-    data: {
-      tipo: DEMO_MARKER,
-      arquivo: 'seed interno demonstrativo',
-      importadoPor: 'seed-demo',
-      resultado: { leitos:105, pacientes:120, internacoesAtivas:84, altasHistoricas:20, profissionais:professionals.length, evolucoesDemo:80, usuariosVinculados:4, observacao:'Dados integralmente fictícios para apresentação.' },
-    },
-  });
-
-  console.log(`Cenário demonstrativo carregado: 105 leitos, 120 pacientes, 84 internações ativas e ${professionals.length} profissionais.`);
+  console.log(`Cenário demonstrativo V3 carregado: 105 leitos, 120 pacientes, 84 internações ativas e ${professionals.length} profissionais.`);
 }
 
 main()
