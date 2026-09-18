@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, errMsg } from '../services/api';
 import { ErrorBox, Modal, PageTitle } from '../components/Common';
 
-const modules = ['pacientes','leitos','internacoes','prontuario','profissionais','escala','dashboard'];
+const modules = ['pacientes','leitos','internacoes','prontuario','profissionais','escala','dashboard','sync'];
 const empty = { username:'', password:'', nome:'', cargo:'', role:'USER', permissoes:{ dashboard:['read'] }, ativo:true };
 const actionLabel = { read:'Leitura', write:'Modificação', delete:'Remoção' };
 
@@ -78,7 +78,7 @@ export default function Usuarios() {
         </div>
         <label><span className="label">Perfil</span><select className="input" value={form.role} onChange={e => setForm({...form,role:e.target.value})}><option value="USER">Usuário com permissões selecionadas</option><option value="ADMIN">Administrador completo</option></select></label>
         {editing && <label className="flex gap-2 items-center"><input type="checkbox" checked={form.ativo} onChange={e => setForm({...form,ativo:e.target.checked})}/> Acesso ativo</label>}
-        {form.role !== 'ADMIN' && <div><div className="label">Permissões</div><div className="border rounded-lg divide-y">{modules.map(m => <div className="p-3 grid md:grid-cols-[160px_1fr] gap-2" key={m}><b className="text-sm capitalize">{m}</b><div className="flex flex-wrap gap-4 text-sm">{['read','write','delete'].map(a => <label key={a}><input type="checkbox" checked={(form.permissoes[m]||[]).includes(a)} onChange={() => toggle(m,a)}/> {actionLabel[a]}</label>)}</div></div>)}</div></div>}
+        {form.role !== 'ADMIN' && <div><div className="label">Permissões</div><div className="border rounded-lg divide-y">{modules.map(m => <div className="p-3 grid md:grid-cols-[160px_1fr] gap-2" key={m}><b className="text-sm capitalize">{m==='sync'?'Importar / Exportar':m}</b><div className="flex flex-wrap gap-4 text-sm">{['read','write','delete'].map(a => <label key={a}><input type="checkbox" checked={(form.permissoes[m]||[]).includes(a)} onChange={() => toggle(m,a)}/> {actionLabel[a]}</label>)}</div></div>)}</div></div>}
         <button className="btn btn-primary">{editing ? 'Salvar alterações' : 'Criar usuário'}</button>
       </form>
     </Modal>
