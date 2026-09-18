@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api, errMsg } from '../services/api';
 import { ErrorBox, Modal, PageTitle, Status } from '../components/Common';
 import { useAuth } from '../context/AuthContext';
@@ -9,6 +10,7 @@ const statuses = ['LIVRE','OCUPADO','BLOQUEADO','MANUTENCAO','RESERVADO'];
 
 export default function Leitos() {
   const { can } = useAuth();
+  const navigate = useNavigate();
   const [list, setList] = useState([]);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -91,7 +93,7 @@ export default function Leitos() {
       {filtered.map(l => <div className="card p-4" key={l.id}>
         <div className="flex justify-between gap-3"><div><div className="text-2xl font-bold">{l.numero}</div><div className="text-sm text-slate-500">{l.andar}º andar · {l.tipo}</div></div><Status value={l.status}/></div>
         {l.observacoes && <div className="text-xs text-slate-400 mt-2">{l.observacoes}</div>}
-        {l.internacoes?.[0] && <div className="mt-3 p-2 bg-red-50 rounded text-sm"><b>{l.internacoes[0].paciente?.nome}</b><br/>Pront. {l.internacoes[0].paciente?.prontuario}</div>}
+        {l.internacoes?.[0] && <div className="mt-3 p-2 bg-red-50 rounded text-sm"><button className="font-bold text-blue-700 hover:underline text-left" onClick={() => navigate(`/pacientes/${l.internacoes[0].paciente?.id}`)}>{l.internacoes[0].paciente?.nome}</button><br/>Pront. {l.internacoes[0].paciente?.prontuario}</div>}
         {can('leitos','write') && <div className="mt-4 flex flex-wrap gap-2"><button className="btn btn-secondary text-xs" onClick={() => editar(l)}>Editar</button>{l.status === 'LIVRE' && <button className="btn btn-secondary text-xs" onClick={() => setBlock({id:l.id,tipo:'BLOQUEADO',motivo:'',dataInicio:''})}>Alterar estado</button>}{['BLOQUEADO','MANUTENCAO','RESERVADO'].includes(l.status) && <button className="btn btn-secondary text-xs" onClick={() => liberar(l.id)}>Liberar</button>}</div>}
       </div>)}
     </div>
