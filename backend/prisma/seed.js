@@ -4,7 +4,7 @@ import bcrypt from 'bcrypt';
 const prisma = new PrismaClient();
 const adminPassword = process.env.SEED_ADMIN_PASSWORD || 'Admin123!';
 const demoPassword = process.env.SEED_DEMO_PASSWORD || 'Demo123!';
-const DEMO_MARKER = 'DEMO_MVP_COMERCIAL_V2';
+const DEMO_MARKER = 'DEMO_MVP_COMERCIAL_V3';
 
 const nomes = ['Ana','Bruno','Carla','Daniel','Eduarda','Felipe','Gabriela','Henrique','Isabela','João','Karina','Lucas','Mariana','Nicolas','Olívia','Paulo','Renata','Samuel','Tatiana','Vinícius'];
 const sobrenomes = ['Almeida','Barbosa','Cardoso','Dias','Ferreira','Gomes','Lima','Martins','Mendes','Moreira','Nascimento','Oliveira','Pereira','Ribeiro','Rocha','Rodrigues','Santos','Silva','Souza','Teixeira'];
@@ -146,6 +146,31 @@ async function main() {
     }
   }
 
+  // Evoluções fictícias para que a ficha do paciente e o prontuário tenham histórico demonstrável.
+  for (let i = 0; i < 40; i++) {
+    const paciente = patients[i];
+    const existing = await prisma.evolucao.count({ where:{ pacienteId:paciente.id, criadoPor:{startsWith:'seed-demo'} } });
+    if (!existing) {
+      for (let n = 0; n < 2; n++) {
+        await prisma.evolucao.create({
+          data:{
+            pacienteId:paciente.id,
+            sinaisVitais:{ pa:`${110 + (i % 25)}/${70 + (i % 15)}`, fc:72 + (i % 24), temp:Number((36.2 + ((i+n)%8)/10).toFixed(1)), spo2:94 + (i % 6) },
+            queixas:n===0 ? 'Avaliação clínica de rotina no cenário demonstrativo.' : 'Paciente refere evolução do quadro nas últimas horas.',
+            condutaMedica:n===1 ? 'Manter acompanhamento e reavaliar conforme evolução clínica.' : null,
+            medicacoes:i % 3 === 0 ? 'Medicações conforme prescrição simulada.' : null,
+            observacoes:n===0 ? 'Paciente avaliado, sinais vitais registrados e cuidados mantidos.' : 'Evolução fictícia para demonstração do prontuário e histórico longitudinal.',
+            tipo:n===0 ? 'ENFERMAGEM' : 'MEDICA',
+            criadoPor:`seed-demo-${n===0?'enfermagem':'medico'}`,
+            criadoPorNome:n===0 ? 'Equipe de Enfermagem Demo' : 'Médico Plantonista Demo',
+            criadoPorCargo:n===0 ? 'ENFERMEIRO' : 'MÉDICO | CLÍNICA MÉDICA',
+            createdAt:addDays(now,-n),
+          },
+        });
+      }
+    }
+  }
+
   // Estados operacionais em leitos livres: manutenção, bloqueio e reserva.
   const freeSemi = bedSpecs.filter(b => b.tipo === 'SEMI_INTENSIVO').slice(4, 7);
   const unavailable = [
@@ -197,18 +222,25 @@ async function main() {
     }
   }
 
-  // Perfis prontos para demonstrar restrições de acesso.
-  await upsertUser({ username: 'recepcao', password: demoPassword, nome: 'Recepção Demo', cargo: 'RECEPÇÃO', permissoes: { pacientes: ['read','write'], leitos: ['read'], internacoes: ['read','write'], dashboard: ['read'] } });
-  await upsertUser({ username: 'enfermagem', password: demoPassword, nome: 'Enfermagem Demo', cargo: 'ENFERMEIRO', permissoes: { pacientes: ['read'], leitos: ['read'], internacoes: ['read'], prontuario: ['read','write'], escala: ['read'], dashboard: ['read'] } });
-  await upsertUser({ username: 'escala', password: demoPassword, nome: 'Gestão de Escala Demo', cargo: 'ADMINISTRATIVO', permissoes: { profissionais: ['read','write','delete'], escala: ['read','write','delete'], dashboard: ['read'] } });
-  await upsertUser({ username: 'gestor', password: demoPassword, nome: 'Gestor Demo', cargo: 'GESTÃO', permissoes: { pacientes: ['read','write'], leitos: ['read','write'], internacoes: ['read','write'], prontuario: ['read'], profissionais: ['read','write'], escala: ['read','write','delete'], dashboard: ['read'] } });
+  // Perfis prontos para demonstrar restrições de acesso e vínculo profissional ↔ usuário.
+  const recepcaoUser = await upsertUser({ username: 'recepcao', password: demoPassword, nome: 'Recepção Demo', cargo: 'RECEPÇÃO', permissoes: { pacientes: ['read','write'], leitos: ['read'], internacoes: ['read','write'], dashboard: ['read'], sync:['read'] } });
+  const enfermagemUser = await upsertUser({ username: 'enfermagem', password: demoPassword, nome: 'Enfermagem Demo', cargo: 'ENFERMEIRO', permissoes: { pacientes: ['read'], leitos: ['read'], internacoes: ['read'], prontuario: ['read','write'], escala: ['read'], dashboard: ['read'] } });
+  const escalaUser = await upsertUser({ username: 'escala', password: demoPassword, nome: 'Gestão de Escala Demo', cargo: 'ADMINISTRATIVO', permissoes: { profissionais: ['read','write','delete'], escala: ['read','write','delete'], dashboard: ['read'] } });
+  const gestorUser = await upsertUser({ username: 'gestor', password: demoPassword, nome: 'Gestor Demo', cargo: 'GESTÃO', permissoes: { pacientes: ['read','write'], leitos: ['read','write'], internacoes: ['read','write'], prontuario: ['read'], profissionais: ['read','write'], escala: ['read','write','delete'], dashboard: ['read'], sync:['read','write'] } });
+
+  const enfermeiroDemo = professionals.find(p => p.cargo === 'ENFERMEIRO');
+  const administrativosDemo = professionals.filter(p => p.cargo === 'ADMINISTRATIVO');
+  if (enfermeiroDemo) await prisma.profissional.update({ where:{id:enfermeiroDemo.id}, data:{usuarioId:enfermagemUser.id} });
+  if (administrativosDemo[0]) await prisma.profissional.update({ where:{id:administrativosDemo[0].id}, data:{usuarioId:escalaUser.id} });
+  if (administrativosDemo[1]) await prisma.profissional.update({ where:{id:administrativosDemo[1].id}, data:{usuarioId:gestorUser.id} });
+  if (administrativosDemo[2]) await prisma.profissional.update({ where:{id:administrativosDemo[2].id}, data:{usuarioId:recepcaoUser.id} });
 
   await prisma.logImportacao.create({
     data: {
       tipo: DEMO_MARKER,
       arquivo: 'seed interno demonstrativo',
       importadoPor: 'seed-demo',
-      resultado: { leitos:105, pacientes:120, internacoesAtivas:84, altasHistoricas:20, profissionais:professionals.length, observacao:'Dados integralmente fictícios para apresentação.' },
+      resultado: { leitos:105, pacientes:120, internacoesAtivas:84, altasHistoricas:20, profissionais:professionals.length, evolucoesDemo:80, usuariosVinculados:4, observacao:'Dados integralmente fictícios para apresentação.' },
     },
   });
 
