@@ -1,11 +1,10 @@
-import { Router } from 'express';
-import bcrypt from 'bcrypt';
+import { createRouter } from '../utils/asyncRouter.js'; import bcrypt from 'bcrypt';
 import { prisma } from '../lib/prisma.js';
 import { authenticate } from '../middleware/auth.js';
 import { adminOnly } from '../middleware/permissions.js';
 import { assert, senhaForte } from '../utils/validation.js';
 
-const router = Router();
+const router = createRouter();
 router.use(authenticate, adminOnly);
 const safeSelect = { id: true, username: true, nome: true, cargo: true, role: true, permissoes: true, ativo: true, createdAt: true, updatedAt: true };
 
