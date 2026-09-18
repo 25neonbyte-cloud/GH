@@ -1,10 +1,9 @@
-import { Router } from 'express';
-import { prisma } from '../lib/prisma.js';
+import { createRouter } from '../utils/asyncRouter.js'; import { prisma } from '../lib/prisma.js';
 import { authenticate } from '../middleware/auth.js';
 import { checkPermission } from '../middleware/permissions.js';
 import { assert, cpfBasico, parseDate } from '../utils/validation.js';
 
-const router = Router();
+const router = createRouter();
 router.use(authenticate);
 router.get('/', checkPermission('pacientes', 'read'), async (req, res) => {
   const { search = '', cpf } = req.query;
