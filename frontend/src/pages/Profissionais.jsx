@@ -21,7 +21,7 @@ export default function Profissionais(){
   const filtered=useMemo(()=>{const t=q.trim().toLowerCase();return !t?list:list.filter(p=>[p.nome,p.registroConselho,p.cargo].filter(Boolean).some(v=>String(v).toLowerCase().includes(t)))},[list,q]);
 
   const novo=()=>{setEditing(null);setForm(blank());setOpen(true)};
-  const editar=p=>{const parts=splitCargo(p.cargo);setEditing(p);setForm({nome:p.nome,registroConselho:p.registroConselho,...parts,acessoEnabled:!!p.usuario,username:p.usuario?.username||'',password:'',acessoAtivo:p.usuario?.ativo!==false,permissoes:p.usuario?.permissoes||{...defaultPerms}});setOpen(true)};
+  const editar=p=>{const parts=splitCargo(p.cargo);setEditing(p);setForm({nome:p.nome,registroConselho:p.registroConselho,...parts,acessoEnabled:!!p.usuario?.ativo,username:p.usuario?.username||'',password:'',acessoAtivo:p.usuario?.ativo!==false,permissoes:p.usuario?.permissoes||{...defaultPerms}});setOpen(true)};
 
   const togglePerm=(m,a)=>{const cur=form.permissoes[m]||[];setForm({...form,permissoes:{...form.permissoes,[m]:cur.includes(a)?cur.filter(x=>x!==a):[...cur,a]}})};
 
