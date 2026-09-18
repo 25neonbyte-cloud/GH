@@ -1,9 +1,8 @@
-import { Router } from 'express';
-import { prisma } from '../lib/prisma.js';
+import { createRouter } from '../utils/asyncRouter.js'; import { prisma } from '../lib/prisma.js';
 import { authenticate } from '../middleware/auth.js';
 import { checkPermission } from '../middleware/permissions.js';
 import { assert } from '../utils/validation.js';
-const router=Router(); router.use(authenticate);
+const router=createRouter(); router.use(authenticate);
 function tipoPorCargo(cargo=''){const c=cargo.toUpperCase();if(c.includes('MED'))return 'MEDICA';if(c.includes('ENFER'))return 'ENFERMAGEM';return 'MULTIPROFISSIONAL';}
 router.get('/paciente/:pacienteId',checkPermission('prontuario','read'),async(req,res)=>{const {tipo}=req.query;const data=await prisma.evolucao.findMany({where:{pacienteId:req.params.pacienteId,...(tipo&&{tipo})},include:{paciente:{select:{nome:true,prontuario:true}}},orderBy:{createdAt:'desc'}});res.json({data});});
 router.post('/paciente/:pacienteId',checkPermission('prontuario','write'),async(req,res)=>{const paciente=await prisma.paciente.findUnique({where:{id:req.params.pacienteId}});assert(paciente,'Paciente não encontrado',404);assert(req.body.observacoes?.trim(),'Observações são obrigatórias');const data=await prisma.evolucao.create({data:{pacienteId:req.params.pacienteId,sinaisVitais:req.body.sinaisVitais||undefined,queixas:req.body.queixas,condutaMedica:req.body.condutaMedica,medicacoes:req.body.medicacoes,observacoes:req.body.observacoes.trim(),tipo:tipoPorCargo(req.user.cargo),criadoPor:req.user.username,criadoPorNome:req.user.nome,criadoPorCargo:req.user.cargo||'NAO_INFORMADO'},include:{paciente:true}});res.status(201).json(data);});
