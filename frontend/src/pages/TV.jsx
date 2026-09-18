@@ -9,7 +9,7 @@ export default function TV(){
   const [andar,setAndar]=useState(''),[tipo,setTipo]=useState(''),[compact,setCompact]=useState(true);
 
   const login=async e=>{e.preventDefault();try{const {data}=await axios.post(`${base}/auth/tv`,{password:pass});sessionStorage.setItem('tv_token',data.token);setToken(data.token);setError('')}catch{setError('Senha inválida')}};
-  const load=async()=>{if(!token)return;try{const {data}=await axios.get(`${base}/tv/leitos`,{headers:{Authorization:`Bearer ${token}`}});setBeds(Array.isArray(data?.data)?data.data:[]);setError('')}catch{setError('Sessão expirada');sessionStorage.removeItem('tv_token');setToken('')}};
+  const load=async()=>{if(!token)return;try{const {data}=await axios.get(`${base}/tv/leitos`,{headers:{Authorization:`Bearer ${token}`}});setBeds(Array.isArray(data?.data)?data.data:[]);setError('')}catch(e){if(e.response?.status===401||e.response?.status===403){setError('Sessão expirada');sessionStorage.removeItem('tv_token');setToken('')}else setError('Não foi possível atualizar agora; o último mapa recebido foi mantido.')}};
   useEffect(()=>{load();const t=setInterval(load,30000);return()=>clearInterval(t)},[token]);
 
   const andares=useMemo(()=>[...new Set(beds.map(b=>b.andar))].sort((a,b)=>a-b),[beds]);
