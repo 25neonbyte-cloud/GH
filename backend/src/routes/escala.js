@@ -1,10 +1,9 @@
-import { Router } from 'express';
-import { prisma } from '../lib/prisma.js';
+import { createRouter } from '../utils/asyncRouter.js'; import { prisma } from '../lib/prisma.js';
 import { authenticate } from '../middleware/auth.js';
 import { checkPermission } from '../middleware/permissions.js';
 import { assert, parseDate } from '../utils/validation.js';
 
-const router = Router();
+const router = createRouter();
 router.use(authenticate);
 const TURNOS = ['MANHA', 'TARDE', 'NOITE'];
 
