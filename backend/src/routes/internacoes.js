@@ -1,12 +1,11 @@
-import { Router } from 'express';
-import { prisma } from '../lib/prisma.js';
+import { createRouter } from '../utils/asyncRouter.js'; import { prisma } from '../lib/prisma.js';
 import { authenticate } from '../middleware/auth.js';
 import { checkPermission } from '../middleware/permissions.js';
 import { assert, parseDate } from '../utils/validation.js';
 import { calcularLOS } from '../utils/los.js';
 import { dashboardCache } from '../services/dashboardCache.js';
 
-const router = Router();
+const router = createRouter();
 router.use(authenticate);
 
 router.get('/', checkPermission('internacoes', 'read'), async (req, res) => {
