@@ -82,6 +82,48 @@ if(!validClinical.body?.templateId||!Array.isArray(validClinical.body?.medicoesC
 }
 await assertHealth('health após evolução clínica válida');
 
+const inheritedWithoutConfirmation=await json('/api/prontuario/paciente/'+clinicalPatient.id,{
+  method:'POST',headers,
+  body:JSON.stringify({
+    templateId:clinicalTemplate.id,
+    conteudo:{observacao:'Conteúdo herdado para validação'},
+    evolucaoOrigemId:validClinical.body.id,
+    camposHerdados:['observacao'],
+  }),
+});
+expectStatus(inheritedWithoutConfirmation.res.status,400,'herança clínica sem confirmação');
+await assertHealth('health após bloqueio de herança não confirmada');
+
+const inheritedConfirmed=await json('/api/prontuario/paciente/'+clinicalPatient.id,{
+  method:'POST',headers,
+  body:JSON.stringify({
+    templateId:clinicalTemplate.id,
+    conteudo:{observacao:'Conteúdo herdado confirmado'},
+    evolucaoOrigemId:validClinical.body.id,
+    camposHerdados:['observacao'],
+    confirmouHerdados:true,
+  }),
+});
+expectStatus(inheritedConfirmed.res.status,201,'herança clínica confirmada');
+
+const problemCreated=await json('/api/prontuario/paciente/'+clinicalPatient.id+'/problemas',{
+  method:'POST',headers,
+  body:JSON.stringify({descricao:'Problema clínico automatizado'}),
+});
+expectStatus(problemCreated.res.status,201,'criar problema clínico');
+const problemId=problemCreated.body?.id;
+if(!problemId) throw new Error('problema clínico não retornou id');
+
+const problemConfirmed=await json('/api/prontuario/problemas/'+problemId+'/confirmar',{method:'POST',headers,body:'{}'});
+expectStatus(problemConfirmed.res.status,200,'confirmar problema clínico');
+
+const problemResolved=await json('/api/prontuario/problemas/'+problemId+'/status',{
+  method:'POST',headers,
+  body:JSON.stringify({status:'RESOLVIDO'}),
+});
+expectStatus(problemResolved.res.status,200,'resolver problema clínico');
+await assertHealth('health após fluxo de problema clínico');
+
 const scales=await json('/api/escala',{headers});
 expectStatus(scales.res.status,200,'listar escala');
 const firstScale=scales.body?.data?.[0];
