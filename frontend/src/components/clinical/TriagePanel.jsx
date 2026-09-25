@@ -1,6 +1,7 @@
 import { useEffect,useState } from 'react';
 import { api,errMsg } from '../../services/api';
 import { ErrorBox } from '../Common';
+import { useAuth } from '../../context/AuthContext';
 import ClinicalForm from './ClinicalForm';
 import { emptyClinicalForm,measurementLabels,measurementPlaceholders,measurementUnits } from '../../utils/clinical';
 
@@ -8,6 +9,7 @@ const emptyMeasurements={pa:'',fc:'',fr:'',temp:'',spo2:'',glicemia:''};
 const precautionOptions=['ISOLAMENTO','COVID','ALERGIA_LATEX'];
 
 export default function TriagePanel({patientId,patient,onChanged}){
+  const {can}=useAuth();
   const [template,setTemplate]=useState(null),[content,setContent]=useState({}),[measurements,setMeasurements]=useState(emptyMeasurements);
   const [precautions,setPrecautions]=useState(patient?.precaucoes||[]),[error,setError]=useState(''),[success,setSuccess]=useState('');
 
@@ -24,6 +26,8 @@ export default function TriagePanel({patientId,patient,onChanged}){
   }catch(e){setError(errMsg(e))}};
 
   if(!template)return <div className="card p-6 text-slate-500">Carregando ficha de triagem...</div>;
+
+  if(!can('prontuario','write'))return <div className="card p-6 text-slate-500">Seu perfil possui acesso de leitura ao prontuário, sem permissão para registrar triagem.</div>;
 
   return <form onSubmit={save} className="card p-4">
     <ErrorBox error={error}/>{success&&<div className="mb-4 p-3 rounded-lg bg-green-50 text-green-700 border border-green-200 text-sm">{success}</div>}
