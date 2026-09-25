@@ -27,6 +27,7 @@ export default function Prontuario(){
   const [content,setContent]=useState({});
   const [measurements,setMeasurements]=useState(emptyMeasurements);
   const [inherited,setInherited]=useState([]);
+  const [confirmedInherited,setConfirmedInherited]=useState(false);
   const [originId,setOriginId]=useState(null);
   const [problem,setProblem]=useState('');
   const [filter,setFilter]=useState('TODOS');
@@ -60,10 +61,12 @@ export default function Prontuario(){
         const inheritedData=inheritedClinicalForm(ctx.data.template,ctx.data.ultimaEvolucao);
         setContent(inheritedData.values);
         setInherited(inheritedData.inherited);
+        setConfirmedInherited(false);
         setOriginId(inheritedData.inherited.length?ctx.data.ultimaEvolucao?.id:null);
       }else if(ctx.data?.template&&!preserveForm){
         setContent(emptyClinicalForm(ctx.data.template));
         setInherited([]);
+        setConfirmedInherited(false);
         setOriginId(null);
       }
       setError('');
@@ -87,11 +90,13 @@ export default function Prontuario(){
         medicoesClinicas:measurements,
         evolucaoOrigemId:originId,
         camposHerdados:inherited,
+        confirmouHerdados:inherited.length===0||confirmedInherited,
       });
       setSuccess('Evolução registrada com autoria, horário e vínculo clínico.');
       setMeasurements(emptyMeasurements);
       setContent(emptyClinicalForm(context?.template));
       setInherited([]);
+      setConfirmedInherited(false);
       setOriginId(null);
       await loadClinical({prefill:false,preserveForm:true});
     }catch(e){setError(errMsg(e));}
@@ -185,7 +190,8 @@ export default function Prontuario(){
           </div>
 
           <ClinicalForm template={context.template} values={content} inherited={inherited} onChange={changeField}/>
-          <button className="btn btn-primary w-full mt-4">Registrar evolução</button>
+          {!!inherited.length&&<label className="mt-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><input type="checkbox" className="mt-1" checked={confirmedInherited} onChange={e=>setConfirmedInherited(e.target.checked)}/><span>Revisei os campos marcados como herdados e confirmo que permanecem válidos nesta evolução.</span></label>}
+          <button className="btn btn-primary w-full mt-4" disabled={inherited.length>0&&!confirmedInherited}>Registrar evolução</button>
         </form>}
 
         <div className="card p-4">
