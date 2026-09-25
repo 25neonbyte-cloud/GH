@@ -24,7 +24,8 @@
     "multer": "^2.0.2",
     "node-cron": "^4.2.1",
     "xlsx": "^0.18.5",
-    "dotenv": "^17.2.2"
+    "dotenv": "^17.2.2",
+    "pdfkit": "^0.15.0"
   },
   "devDependencies": {
     "prisma": "^5.22.0"
