@@ -12,7 +12,28 @@ router.get('/', checkPermission('pacientes', 'read'), async (req, res) => {
   res.json({ data });
 });
 router.get('/:id', checkPermission('pacientes', 'read'), async (req, res) => {
-  const data = await prisma.paciente.findUnique({ where: { id: req.params.id }, include: { internacoes: { include: { leito: true }, orderBy: { dataInternacao: 'desc' } }, evolucoes: { orderBy: { createdAt: 'desc' } } } });
+  const data = await prisma.paciente.findUnique({
+    where: { id: req.params.id },
+    include: {
+      internacoes: { include: { leito: true }, orderBy: { dataInternacao: 'desc' } },
+      evolucoes: {
+        include: {
+          template: true,
+          profissional: { select: { id: true, nome: true, cargo: true, registroConselho: true } },
+          medicoesClinicas: { orderBy: { observadoEm: 'asc' } },
+        },
+        orderBy: { createdAt: 'desc' },
+      },
+      problemasClinicos: {
+        include: {
+          criadoPorProfissional: { select: { nome: true, cargo: true } },
+          eventos: { orderBy: { ocorridoEm: 'desc' }, take: 1, include: { profissional: { select: { nome: true, cargo: true } } } },
+        },
+        orderBy: { iniciadoEm: 'desc' },
+      },
+      medicoesClinicas: { orderBy: { observadoEm: 'desc' }, take: 100 },
+    },
+  });
   if (!data) return res.status(404).json({ error: 'Paciente não encontrado' });
   res.json(data);
 });
