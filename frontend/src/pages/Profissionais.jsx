@@ -105,7 +105,7 @@ export default function Profissionais(){
     <div className="card overflow-x-auto"><table className="table"><thead><tr><th>Nome</th><th>Registro</th><th>Função</th><th>Departamento</th><th>Acesso</th><th>Status</th><th>Ações</th></tr></thead><tbody>
       {filtered.map(p=>{
         const ind=p.indisponibilidades?.[0];
-        const temporary=ind&&!ind.indeterminado;
+        const temporary=ind&&!ind.indeterminado&&(!ind.fim||new Date(ind.fim)>=new Date());
         return <tr key={p.id}>
           <td className="font-semibold">{p.nome}</td>
           <td>{p.registroConselho}</td>
