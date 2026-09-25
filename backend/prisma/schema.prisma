@@ -183,6 +183,7 @@ enum TipoEvolucao {
   ENFERMAGEM
   MEDICA
   MULTIPROFISSIONAL
+  TRIAGEM
 }
 
 model Profissional {
@@ -193,7 +194,11 @@ model Profissional {
   ativo            Boolean  @default(true)
   usuarioId        String?  @unique
   usuario          Usuario? @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+  departamentoPrincipalId String?
+  departamentoPrincipal   Departamento? @relation("DepartamentoPrincipal", fields: [departamentoPrincipalId], references: [id], onDelete: SetNull)
   escalas          Escala[]
+  indisponibilidades IndisponibilidadeProfissional[]
+  alertasEscala    AlertaEscala[]
   evolucoes        Evolucao[]
   medicoesClinicas MedicaoClinica[]
   problemasCriados ProblemaClinico[] @relation("ProblemaCriadoPor")
@@ -210,6 +215,8 @@ model Escala {
   id             String       @id @default(uuid())
   profissionalId String
   profissional   Profissional @relation(fields: [profissionalId], references: [id])
+  departamentoId String?
+  departamento   Departamento? @relation(fields: [departamentoId], references: [id], onDelete: SetNull)
   data           DateTime
   turno          Turno
   createdAt      DateTime     @default(now())
@@ -218,6 +225,7 @@ model Escala {
 
   @@unique([profissionalId, data, turno])
   @@index([data])
+  @@index([departamentoId])
   @@map("escalas")
 }
 
@@ -318,3 +326,49 @@ model ProblemaClinicoEvento {
   @@index([problemaId, ocorridoEm])
   @@map("problemas_clinicos_eventos")
 }
+
+model Departamento {
+  id                      String   @id @default(uuid())
+  nome                    String   @unique
+  ativo                   Boolean  @default(true)
+  profissionaisPrincipais Profissional[] @relation("DepartamentoPrincipal")
+  escalas                 Escala[]
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  @@index([ativo, nome])
+  @@map("departamentos")
+}
+
+model IndisponibilidadeProfissional {
+  id             String   @id @default(uuid())
+  profissionalId String
+  profissional   Profissional @relation(fields: [profissionalId], references: [id], onDelete: Cascade)
+  inicio         DateTime
+  fim            DateTime?
+  indeterminado  Boolean  @default(false)
+  motivo         String?
+  ativo          Boolean  @default(true)
+  createdBy      String
+  createdAt      DateTime @default(now())
+  encerradoEm    DateTime?
+  encerradoBy    String?
+
+  @@index([profissionalId, ativo, inicio])
+  @@map("indisponibilidades_profissionais")
+}
+
+model AlertaEscala {
+  id             String   @id @default(uuid())
+  profissionalId String?
+  profissional   Profissional? @relation(fields: [profissionalId], references: [id], onDelete: SetNull)
+  titulo         String
+  mensagem       String
+  detalhes       Json?
+  lidoPor        String[] @default([])
+  createdAt      DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("alertas_escala")
+}
+
