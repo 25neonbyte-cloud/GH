@@ -135,4 +135,80 @@ const duplicateScale=await json('/api/escala',{
 expectStatus(duplicateScale.res.status,409,'plantão duplicado');
 await assertHealth('health após erro de regra na escala');
 
+const triageTemplate=await json('/api/prontuario/triagem/template',{headers});
+expectStatus(triageTemplate.res.status,200,'carregar template de triagem');
+const triage=await json('/api/prontuario/paciente/'+clinicalPatient.id+'/triagem',{
+  method:'POST',headers,
+  body:JSON.stringify({
+    conteudo:{queixaPrincipal:'Teste automatizado de triagem',origemAtendimento:'CI',classificacaoRisco:'Teste',observacao:'Triagem automatizada'},
+    medicoesClinicas:{pa:'118/76',fc:78,fr:18,temp:36.6,spo2:98},
+    precaucoes:[],
+  }),
+});
+expectStatus(triage.res.status,201,'registrar triagem estruturada');
+if(triage.body?.tipo!=='TRIAGEM')throw new Error('triagem não foi registrada como evento TRIAGEM');
+
+const departments=await json('/api/departamentos',{headers});
+expectStatus(departments.res.status,200,'listar departamentos');
+const testDepartment=departments.body?.data?.find(x=>x.nome==='CLINICA MÉDICA')||departments.body?.data?.[0];
+if(!testDepartment)throw new Error('catálogo de departamentos vazio');
+
+const testPro=await json('/api/profissionais',{
+  method:'POST',headers,
+  body:JSON.stringify({
+    nome:'Profissional CI Afastamento',
+    registroConselho:'CI-ESCALA-001',
+    cargo:'ENFERMEIRO',
+    departamentoPrincipalId:testDepartment.id,
+  }),
+});
+expectStatus(testPro.res.status,201,'criar profissional com departamento');
+if(testPro.body?.departamentoPrincipalId!==testDepartment.id)throw new Error('departamento principal não foi persistido');
+
+const today=new Date();
+const datePlus=n=>{const d=new Date(Date.UTC(today.getUTCFullYear(),today.getUTCMonth(),today.getUTCDate()+n));return d.toISOString().slice(0,10)};
+const shift1=datePlus(1),shift2=datePlus(3);
+
+for(const date of [shift1,shift2]){
+  const created=await json('/api/escala',{
+    method:'POST',headers,
+    body:JSON.stringify({profissionalId:testPro.body.id,departamentoId:testDepartment.id,data:date,turno:'MANHA'}),
+  });
+  expectStatus(created.res.status,201,'criar plantão departamental '+date);
+}
+
+for(const formato of ['xlsx','pdf']){
+  const response=await fetch(base+'/api/escala/exportar?'+new URLSearchParams({
+    profissionalId:testPro.body.id,dataInicio:shift1,dataFim:datePlus(7),formato,
+  }),{headers:{Authorization:'Bearer '+token}});
+  expectStatus(response.status,200,'exportar escala '+formato);
+  const bytes=await response.arrayBuffer();
+  if(bytes.byteLength<100)throw new Error('exportação '+formato+' retornou arquivo vazio');
+}
+
+const impact=await json('/api/profissionais/'+testPro.body.id+'/impacto-inativacao?dias=5',{headers});
+expectStatus(impact.res.status,200,'calcular impacto de afastamento');
+if(impact.body?.escalasPeriodo<2)throw new Error('impacto de afastamento não identificou plantões do período');
+
+const absence=await json('/api/profissionais/'+testPro.body.id+'/inativar',{
+  method:'POST',headers,
+  body:JSON.stringify({modo:'TEMPORARIA',dias:5,motivo:'Teste CI'}),
+});
+expectStatus(absence.res.status,200,'registrar afastamento temporário');
+if(absence.body?.escalasRemovidas!==2)throw new Error('afastamento temporário não removeu os plantões previstos');
+
+const blockedShift=await json('/api/escala',{
+  method:'POST',headers,
+  body:JSON.stringify({profissionalId:testPro.body.id,departamentoId:testDepartment.id,data:shift1,turno:'TARDE'}),
+});
+expectStatus(blockedShift.res.status,409,'bloquear escala durante afastamento');
+
+const alerts=await json('/api/escala/alertas',{headers});
+expectStatus(alerts.res.status,200,'listar alertas de escala');
+const createdAlert=alerts.body?.data?.find(x=>x.profissionalId===testPro.body.id);
+if(!createdAlert)throw new Error('afastamento não gerou alerta de escala');
+const markRead=await fetch(base+'/api/escala/alertas/'+createdAlert.id+'/lido',{method:'POST',headers});
+expectStatus(markRead.status,204,'marcar alerta como lido');
+await assertHealth('health após triagem, exportação e afastamento');
+
 console.log('API resiliente: validações e conflitos retornam HTTP sem derrubar o processo.');
