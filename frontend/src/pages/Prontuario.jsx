@@ -177,7 +177,7 @@ export default function Prontuario(){
 
       {!!latest.length&&<div className="card p-4 mb-4">
         <h2 className="font-bold mb-3">Últimas medições registradas</h2>
-        <div className="flex flex-wrap gap-2">{latest.map(m=><div key={m.id} className="bg-slate-50 rounded-lg px-3 py-2 text-sm"><div className="text-xs text-slate-500">{measurementLabels[m.codigo]||m.codigo}</div><b>{measurementValue(m)}</b><div className="text-[11px] text-slate-400">{fmtBrasilia(m.observadoEm)}</div></div>)}</div>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">{latest.map(m=>{const trend=(context.tendenciasMedicoes?.[m.codigo]||[]).slice().reverse();return <div key={m.id} className="bg-slate-50 rounded-lg px-3 py-2 text-sm"><div className="text-xs text-slate-500">{measurementLabels[m.codigo]||m.codigo}</div><b>{measurementValue(m)}</b><div className="text-[11px] text-slate-400">{fmtBrasilia(m.observadoEm)}</div>{trend.length>1&&<div className="text-[11px] text-slate-500 mt-2 truncate" title="Sequência cronológica das últimas medições">Tendência: {trend.map(x=>x.valorTexto??x.valorNumerico).join(' → ')}</div>}</div>})}</div>
       </div>}
 
       <div className="grid xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)] gap-4 mb-5">
