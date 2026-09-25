@@ -16,8 +16,8 @@ import {
 const router = createRouter();
 router.use(authenticate);
 
-async function templateParaUsuario(req, templateId) {
-  const categoria = categoriaPorCargo(req.user.cargo);
+async function templateParaUsuario(req, templateId, cargoProfissional) {
+  const categoria = categoriaPorCargo(cargoProfissional || req.user.cargo);
   const template = templateId
     ? await prisma.templateEvolucao.findUnique({ where: { id: templateId } })
     : await prisma.templateEvolucao.findFirst({
@@ -33,7 +33,8 @@ async function templateParaUsuario(req, templateId) {
 }
 
 router.get('/templates/minha', checkPermission('prontuario', 'read'), async (req, res) => {
-  const categoria = categoriaPorCargo(req.user.cargo);
+  const profissional = await profissionalDoUsuario(prisma, req.user.id);
+  const categoria = categoriaPorCargo(profissional?.cargo || req.user.cargo);
   const data = await prisma.templateEvolucao.findMany({
     where: { ativo: true, ...(req.user.role === 'ADMIN' ? {} : { categoriaProfissional: categoria }) },
     orderBy: [{ categoriaProfissional: 'asc' }, { versao: 'desc' }],
@@ -49,7 +50,7 @@ router.get('/paciente/:pacienteId/contexto', checkPermission('prontuario', 'read
   assert(paciente, 'Paciente não encontrado', 404);
 
   const profissional = await profissionalDoUsuario(prisma, req.user.id);
-  const { template, categoria } = await templateParaUsuario(req, req.query.templateId);
+  const { template, categoria } = await templateParaUsuario(req, req.query.templateId, profissional?.cargo);
 
   const [internacao, ultimaEstruturada, problemas, medicoes] = await Promise.all([
     prisma.internacao.findFirst({
@@ -157,7 +158,7 @@ router.post('/paciente/:pacienteId', checkPermission('prontuario', 'write'), asy
 
   const profissional = await profissionalDoUsuario(prisma, req.user.id);
   if (req.user.role !== 'ADMIN') assert(profissional?.ativo, 'Seu usuário não está vinculado a um profissional ativo', 409);
-  const { template, categoria } = await templateParaUsuario(req, req.body.templateId);
+  const { template, categoria } = await templateParaUsuario(req, req.body.templateId, profissional?.cargo);
   const conteudo = validarConteudoTemplate(template, req.body.conteudo || {});
   const medicoes = normalizarMedicoes(req.body.medicoesClinicas || req.body.sinaisVitais || {});
   const legado = legacyFields(conteudo);
