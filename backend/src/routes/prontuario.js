@@ -32,6 +32,98 @@ async function templateParaUsuario(req, templateId, cargoProfissional) {
   return { template, categoria };
 }
 
+router.get('/triagem/template', checkPermission('prontuario', 'read'), async (req, res) => {
+  const template = await prisma.templateEvolucao.findFirst({
+    where: { codigo: 'TRIAGEM_PADRAO', ativo: true },
+    orderBy: { versao: 'desc' },
+  });
+  assert(template, 'Template de triagem não encontrado', 404);
+  res.json(template);
+});
+
+router.post('/paciente/:pacienteId/triagem', checkPermission('prontuario', 'write'), async (req, res) => {
+  const paciente = await prisma.paciente.findUnique({ where: { id: req.params.pacienteId } });
+  assert(paciente, 'Paciente não encontrado', 404);
+
+  const profissional = await profissionalDoUsuario(prisma, req.user.id);
+  if (req.user.role !== 'ADMIN') assert(profissional?.ativo, 'Seu usuário não está vinculado a um profissional ativo', 409);
+
+  const template = await prisma.templateEvolucao.findFirst({
+    where: { codigo: 'TRIAGEM_PADRAO', ativo: true },
+    orderBy: { versao: 'desc' },
+  });
+  assert(template, 'Template de triagem não encontrado', 404);
+
+  const allowedPrecautions = ['ISOLAMENTO','COVID','ALERGIA_LATEX'];
+  const precaucoes = Array.isArray(req.body.precaucoes)
+    ? req.body.precaucoes.filter(x => allowedPrecautions.includes(x))
+    : paciente.precaucoes;
+
+  const rawContent = {
+    ...(req.body.conteudo || {}),
+    precaucoesAtuais: precaucoes.length ? precaucoes.join(', ') : 'Nenhuma',
+  };
+  const conteudo = validarConteudoTemplate(template, rawContent);
+  const medicoes = normalizarMedicoes(req.body.medicoesClinicas || {});
+  const legado = legacyFields(conteudo);
+  const internacao = await prisma.internacao.findFirst({
+    where: { pacienteId: paciente.id, status: 'ATIVA' },
+    orderBy: { dataInternacao: 'desc' },
+  });
+
+  const data = await prisma.$transaction(async tx => {
+    await tx.paciente.update({
+      where: { id: paciente.id },
+      data: { precaucoes, updatedBy: req.user.username },
+    });
+
+    const evolucao = await tx.evolucao.create({
+      data: {
+        pacienteId: paciente.id,
+        internacaoId: internacao?.id || null,
+        profissionalId: profissional?.id || null,
+        templateId: template.id,
+        templateVersao: template.versao,
+        conteudo,
+        assinadaEm: new Date(),
+        sinaisVitais: medicoes.length ? sinaisVitaisLegado(medicoes) : undefined,
+        queixas: legado.queixas,
+        observacoes: legado.observacoes,
+        tipo: 'TRIAGEM',
+        criadoPor: req.user.username,
+        criadoPorNome: profissional?.nome || req.user.nome,
+        criadoPorCargo: profissional?.cargo || req.user.cargo || 'NAO_INFORMADO',
+      },
+    });
+
+    if (medicoes.length) {
+      await tx.medicaoClinica.createMany({
+        data: medicoes.map(item => ({
+          ...item,
+          pacienteId: paciente.id,
+          internacaoId: internacao?.id || null,
+          evolucaoId: evolucao.id,
+          profissionalId: profissional?.id || null,
+          observadoEm: new Date(),
+          criadoPor: req.user.username,
+        })),
+      });
+    }
+
+    return tx.evolucao.findUnique({
+      where: { id: evolucao.id },
+      include: {
+        template: true,
+        internacao: { include: { leito: true } },
+        profissional: { select: { id: true, nome: true, cargo: true, registroConselho: true } },
+        medicoesClinicas: true,
+      },
+    });
+  });
+
+  res.status(201).json(data);
+});
+
 router.get('/templates/minha', checkPermission('prontuario', 'read'), async (req, res) => {
   const profissional = await profissionalDoUsuario(prisma, req.user.id);
   const categoria = categoriaPorCargo(profissional?.cargo || req.user.cargo);
