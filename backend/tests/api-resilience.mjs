@@ -47,6 +47,41 @@ const duplicatePro=await json('/api/profissionais',{
 expectStatus(duplicatePro.res.status,409,'registro profissional duplicado');
 await assertHealth('health após erro Prisma 409');
 
+const patientList=await json('/api/pacientes',{headers});
+expectStatus(patientList.res.status,200,'listar pacientes para teste clínico');
+const clinicalPatient=patientList.body?.data?.[0];
+if(!clinicalPatient) throw new Error('base demonstrativa sem paciente para teste clínico');
+
+const templateList=await json('/api/prontuario/templates/minha',{headers});
+expectStatus(templateList.res.status,200,'listar templates clínicos');
+const clinicalTemplate=templateList.body?.data?.find(x=>x.categoriaProfissional==='MULTIPROFISSIONAL')||templateList.body?.data?.[0];
+if(!clinicalTemplate) throw new Error('base demonstrativa sem template clínico');
+
+const invalidClinical=await json('/api/prontuario/paciente/'+clinicalPatient.id,{
+  method:'POST',headers,
+  body:JSON.stringify({
+    templateId:clinicalTemplate.id,
+    conteudo:{observacao:'Teste automatizado de validação'},
+    medicoesClinicas:{fc:'123456789as',temp:'abc123'},
+  }),
+});
+expectStatus(invalidClinical.res.status,400,'sinais vitais inválidos');
+await assertHealth('health após validação clínica 400');
+
+const validClinical=await json('/api/prontuario/paciente/'+clinicalPatient.id,{
+  method:'POST',headers,
+  body:JSON.stringify({
+    templateId:clinicalTemplate.id,
+    conteudo:{observacao:'Evolução estruturada criada pelo teste de resiliência'},
+    medicoesClinicas:{pa:'120/80',fc:80,temp:36.7,spo2:98},
+  }),
+});
+expectStatus(validClinical.res.status,201,'criar evolução clínica estruturada');
+if(!validClinical.body?.templateId||!Array.isArray(validClinical.body?.medicoesClinicas)||validClinical.body.medicoesClinicas.length<4) {
+  throw new Error('evolução estruturada não retornou template e medições esperados');
+}
+await assertHealth('health após evolução clínica válida');
+
 const scales=await json('/api/escala',{headers});
 expectStatus(scales.res.status,200,'listar escala');
 const firstScale=scales.body?.data?.[0];
