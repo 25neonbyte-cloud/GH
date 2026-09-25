@@ -88,8 +88,11 @@ router.get('/paciente/:pacienteId/contexto', checkPermission('prontuario', 'read
   }
 
   const latest = {};
+  const trends = {};
   for (const medicao of medicoes) {
     if (!latest[medicao.codigo]) latest[medicao.codigo] = medicao;
+    if (!trends[medicao.codigo]) trends[medicao.codigo] = [];
+    if (trends[medicao.codigo].length < 6) trends[medicao.codigo].push(medicao);
   }
 
   res.json({
@@ -101,6 +104,7 @@ router.get('/paciente/:pacienteId/contexto', checkPermission('prontuario', 'read
     ultimaEvolucao,
     problemas,
     ultimasMedicoes: latest,
+    tendenciasMedicoes: trends,
     timezoneApresentacao: 'America/Sao_Paulo',
   });
 });
