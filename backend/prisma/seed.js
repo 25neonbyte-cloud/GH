@@ -184,7 +184,7 @@ async function ensureClinicalTemplates() {
         { key:'observacao', label:'Observações da triagem', type:'textarea', required:true },
       ]},
       interface: { sections:[
-        { title:'Triagem assistencial', fields:['queixaPrincipal','origemAtendimento','classificacaoRisco','precaucoesAtuais','observacao'] },
+        { title:'Triagem assistencial', fields:['queixaPrincipal','origemAtendimento','classificacaoRisco','observacao'] },
       ]},
     },
     {
