@@ -178,6 +178,7 @@ router.post('/paciente/:pacienteId', checkPermission('prontuario', 'write'), asy
   const camposHerdados = Array.isArray(req.body.camposHerdados)
     ? req.body.camposHerdados.filter(key => Object.prototype.hasOwnProperty.call(conteudo, key))
     : [];
+  assert(camposHerdados.length === 0 || req.body.confirmouHerdados === true, 'Confirme a revisão dos campos herdados antes de registrar a evolução');
 
   const data = await prisma.$transaction(async tx => {
     const evolucao = await tx.evolucao.create({
