@@ -42,7 +42,7 @@ const firstPro=pros.body?.data?.[0];
 if(!firstPro) throw new Error('base demonstrativa sem profissional');
 const duplicatePro=await json('/api/profissionais',{
   method:'POST',headers,
-  body:JSON.stringify({nome:'Duplicado Teste',registroConselho:firstPro.registroConselho,cargo:'ENFERMEIRO'}),
+  body:JSON.stringify({nome:'Duplicado Teste',registroConselho:firstPro.registroConselho,cargo:'ENFERMEIRO',departamentoPrincipalId:firstPro.departamentoPrincipalId}),
 });
 expectStatus(duplicatePro.res.status,409,'registro profissional duplicado');
 await assertHealth('health após erro Prisma 409');
