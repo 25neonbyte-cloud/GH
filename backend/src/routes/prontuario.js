@@ -115,6 +115,7 @@ router.get('/paciente/:pacienteId/timeline', checkPermission('prontuario', 'read
       where: { pacienteId: req.params.pacienteId },
       include: {
         template: true,
+        internacao: { include: { leito: true } },
         profissional: { select: { id: true, nome: true, cargo: true, registroConselho: true } },
         medicoesClinicas: { orderBy: { observadoEm: 'asc' } },
       },
