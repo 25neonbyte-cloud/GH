@@ -8,7 +8,6 @@ const items=[
   ['/leitos','▤','Leitos','leitos'],
   ['/internacoes','⇄','Internações','internacoes'],
   ['/pacientes','◉','Pacientes','pacientes'],
-  ['/prontuario','▣','Prontuário','prontuario'],
   ['/profissionais','♙','Profissionais','profissionais'],
   ['/escala','▦','Escala','escala'],
   ['/usuarios','⚙','Usuários','usuarios'],
