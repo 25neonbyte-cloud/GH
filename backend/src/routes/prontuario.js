@@ -156,6 +156,7 @@ router.post('/paciente/:pacienteId', checkPermission('prontuario', 'write'), asy
   assert(paciente, 'Paciente não encontrado', 404);
 
   const profissional = await profissionalDoUsuario(prisma, req.user.id);
+  if (req.user.role !== 'ADMIN') assert(profissional?.ativo, 'Seu usuário não está vinculado a um profissional ativo', 409);
   const { template, categoria } = await templateParaUsuario(req, req.body.templateId);
   const conteudo = validarConteudoTemplate(template, req.body.conteudo || {});
   const medicoes = normalizarMedicoes(req.body.medicoesClinicas || req.body.sinaisVitais || {});
@@ -236,6 +237,7 @@ router.post('/paciente/:pacienteId/problemas', checkPermission('prontuario', 'wr
   assert(paciente, 'Paciente não encontrado', 404);
 
   const profissional = await profissionalDoUsuario(prisma, req.user.id);
+  if (req.user.role !== 'ADMIN') assert(profissional?.ativo, 'Seu usuário não está vinculado a um profissional ativo', 409);
   const internacao = await prisma.internacao.findFirst({
     where: { pacienteId: paciente.id, status: 'ATIVA' },
     orderBy: { dataInternacao: 'desc' },
@@ -274,6 +276,7 @@ router.post('/problemas/:id/confirmar', checkPermission('prontuario', 'write'), 
   assert(problema, 'Problema clínico não encontrado', 404);
   assert(problema.status === 'ATIVO', 'Somente problemas ativos podem ser confirmados', 409);
   const profissional = await profissionalDoUsuario(prisma, req.user.id);
+  if (req.user.role !== 'ADMIN') assert(profissional?.ativo, 'Seu usuário não está vinculado a um profissional ativo', 409);
 
   const evento = await prisma.problemaClinicoEvento.create({
     data: {
@@ -295,6 +298,7 @@ router.post('/problemas/:id/status', checkPermission('prontuario', 'write'), asy
   assert(['ATIVO', 'RESOLVIDO'].includes(novoStatus), 'Status clínico inválido');
 
   const profissional = await profissionalDoUsuario(prisma, req.user.id);
+  if (req.user.role !== 'ADMIN') assert(profissional?.ativo, 'Seu usuário não está vinculado a um profissional ativo', 409);
   const result = await prisma.$transaction(async tx => {
     const atual = await tx.problemaClinico.findUnique({ where: { id: req.params.id } });
     assert(atual, 'Problema clínico não encontrado', 404);
