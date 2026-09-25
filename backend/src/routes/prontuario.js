@@ -51,20 +51,14 @@ router.get('/paciente/:pacienteId/contexto', checkPermission('prontuario', 'read
   const profissional = await profissionalDoUsuario(prisma, req.user.id);
   const { template, categoria } = await templateParaUsuario(req, req.query.templateId);
 
-  const [internacao, ultimaEvolucao, problemas, medicoes] = await Promise.all([
+  const [internacao, ultimaEstruturada, problemas, medicoes] = await Promise.all([
     prisma.internacao.findFirst({
       where: { pacienteId: paciente.id, status: 'ATIVA' },
       include: { leito: true },
       orderBy: { dataInternacao: 'desc' },
     }),
     prisma.evolucao.findFirst({
-      where: {
-        pacienteId: paciente.id,
-        OR: [
-          { templateId: template.id },
-          { tipo: tipoPorCategoria(categoria) },
-        ],
-      },
+      where: { pacienteId: paciente.id, templateId: template.id },
       include: { template: true, profissional: true, medicoesClinicas: true },
       orderBy: { createdAt: 'desc' },
     }),
@@ -82,6 +76,15 @@ router.get('/paciente/:pacienteId/contexto', checkPermission('prontuario', 'read
       take: 100,
     }),
   ]);
+
+  let ultimaEvolucao = ultimaEstruturada;
+  if (!ultimaEvolucao && ['MEDICA','ENFERMAGEM'].includes(categoria)) {
+    ultimaEvolucao = await prisma.evolucao.findFirst({
+      where: { pacienteId: paciente.id, templateId: null, tipo: tipoPorCategoria(categoria) },
+      include: { template: true, profissional: true, medicoesClinicas: true },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
 
   const latest = {};
   for (const medicao of medicoes) {
@@ -167,6 +170,7 @@ router.post('/paciente/:pacienteId', checkPermission('prontuario', 'write'), asy
   if (req.body.evolucaoOrigemId) {
     evolucaoOrigem = await prisma.evolucao.findUnique({ where: { id: req.body.evolucaoOrigemId } });
     assert(evolucaoOrigem?.pacienteId === paciente.id, 'Evolução de origem inválida', 409);
+    assert(evolucaoOrigem.templateId === template.id, 'A evolução anterior pertence a outra ficha profissional', 409);
   }
 
   const camposHerdados = Array.isArray(req.body.camposHerdados)
