@@ -110,7 +110,93 @@ async function markDemoV3(source) {
   });
 }
 
+async function ensureClinicalTemplates() {
+  const templates = [
+    {
+      codigo: 'MEDICA_PADRAO',
+      nome: 'Evolução médica',
+      categoriaProfissional: 'MEDICA',
+      versao: 1,
+      schema: { fields: [
+        { key:'estadoGeral', label:'Estado geral', type:'select', options:['Bom','Regular','Grave'], required:false },
+        { key:'queixaPrincipal', label:'Queixa / evolução do quadro', type:'textarea', required:false },
+        { key:'exameFisico', label:'Exame físico', type:'textarea', required:false },
+        { key:'avaliacao', label:'Avaliação / impressão clínica', type:'textarea', required:false },
+        { key:'conduta', label:'Conduta', type:'textarea', required:false },
+        { key:'observacao', label:'Evolução médica', type:'textarea', required:true },
+      ]},
+      interface: { sections:[
+        { title:'Avaliação clínica', fields:['estadoGeral','queixaPrincipal','exameFisico','avaliacao'] },
+        { title:'Plano', fields:['conduta','observacao'] },
+      ]},
+    },
+    {
+      codigo: 'ENFERMAGEM_PADRAO',
+      nome: 'Evolução de enfermagem',
+      categoriaProfissional: 'ENFERMAGEM',
+      versao: 1,
+      schema: { fields: [
+        { key:'estadoGeral', label:'Estado geral', type:'select', options:['Bom','Regular','Grave'], required:false },
+        { key:'nivelConsciencia', label:'Nível de consciência', type:'select', options:['Alerta','Sonolento','Obnubilado','Inconsciente'], required:false },
+        { key:'dor', label:'Dor (0–10)', type:'number', min:0, max:10, required:false },
+        { key:'pele', label:'Integridade da pele', type:'select', options:['Preservada','Lesão presente','Risco aumentado'], required:false },
+        { key:'mobilidade', label:'Mobilidade', type:'select', options:['Independente','Assistida','Restrita ao leito'], required:false },
+        { key:'dieta', label:'Dieta / aceitação', type:'text', required:false },
+        { key:'eliminacoes', label:'Eliminações', type:'text', required:false },
+        { key:'dispositivos', label:'Dispositivos / acessos', type:'textarea', required:false },
+        { key:'observacao', label:'Evolução de enfermagem', type:'textarea', required:true },
+      ]},
+      interface: { sections:[
+        { title:'Avaliação', fields:['estadoGeral','nivelConsciencia','dor','pele','mobilidade'] },
+        { title:'Cuidados', fields:['dieta','eliminacoes','dispositivos','observacao'] },
+      ]},
+    },
+    {
+      codigo: 'FISIOTERAPIA_PADRAO',
+      nome: 'Evolução fisioterapêutica',
+      categoriaProfissional: 'FISIOTERAPIA',
+      versao: 1,
+      schema: { fields: [
+        { key:'padraoRespiratorio', label:'Padrão respiratório', type:'select', options:['Eupneico','Taquipneico','Bradipneico','Dispneico'], required:false },
+        { key:'oxigenoterapia', label:'Oxigenoterapia', type:'select', options:['Não','Sim'], required:false },
+        { key:'dispositivoO2', label:'Dispositivo de O₂', type:'text', required:false },
+        { key:'fluxoO2', label:'Fluxo O₂ (L/min)', type:'number', min:0, max:60, required:false },
+        { key:'mobilidade', label:'Mobilidade', type:'select', options:['Independente','Assistida','Restrita ao leito'], required:false },
+        { key:'forcaMuscular', label:'Força muscular (0–5)', type:'number', min:0, max:5, required:false },
+        { key:'condutaFisio', label:'Conduta fisioterapêutica', type:'textarea', required:false },
+        { key:'observacao', label:'Evolução fisioterapêutica', type:'textarea', required:true },
+      ]},
+      interface: { sections:[
+        { title:'Respiratório', fields:['padraoRespiratorio','oxigenoterapia','dispositivoO2','fluxoO2'] },
+        { title:'Funcional', fields:['mobilidade','forcaMuscular','condutaFisio','observacao'] },
+      ]},
+    },
+    {
+      codigo: 'MULTIPROFISSIONAL_PADRAO',
+      nome: 'Evolução multiprofissional',
+      categoriaProfissional: 'MULTIPROFISSIONAL',
+      versao: 1,
+      schema: { fields: [
+        { key:'avaliacao', label:'Avaliação', type:'textarea', required:false },
+        { key:'intervencao', label:'Intervenção realizada', type:'textarea', required:false },
+        { key:'plano', label:'Plano / acompanhamento', type:'textarea', required:false },
+        { key:'observacao', label:'Evolução multiprofissional', type:'textarea', required:true },
+      ]},
+      interface: { sections:[{ title:'Evolução', fields:['avaliacao','intervencao','plano','observacao'] }] },
+    },
+  ];
+
+  for (const template of templates) {
+    await prisma.templateEvolucao.upsert({
+      where: { codigo_versao: { codigo: template.codigo, versao: template.versao } },
+      update: { ativo:true, nome:template.nome, categoriaProfissional:template.categoriaProfissional },
+      create: template,
+    });
+  }
+}
+
 async function main() {
+  await ensureClinicalTemplates();
   await upsertUser({ username: 'admin', password: adminPassword, nome: 'Administrador', cargo: 'ADMINISTRATIVO', role: 'ADMIN', permissoes: {} });
 
   const marker = await prisma.logImportacao.findFirst({ where: { tipo: DEMO_MARKER } });
