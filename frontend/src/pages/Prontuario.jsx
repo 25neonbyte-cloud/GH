@@ -44,7 +44,7 @@ export default function Prontuario(){
       .catch(e=>setError(errMsg(e)));
   },[]);
 
-  const loadClinical=async({prefill=true}={})=>{
+  const loadClinical=async({prefill=true,preserveForm=false}={})=>{
     if(!pid){setContext(null);setTimeline([]);return;}
     try{
       const params=templateId?{templateId}:{};
@@ -61,7 +61,7 @@ export default function Prontuario(){
         setContent(inheritedData.values);
         setInherited(inheritedData.inherited);
         setOriginId(inheritedData.inherited.length?ctx.data.ultimaEvolucao?.id:null);
-      }else if(ctx.data?.template){
+      }else if(ctx.data?.template&&!preserveForm){
         setContent(emptyClinicalForm(ctx.data.template));
         setInherited([]);
         setOriginId(null);
@@ -90,7 +90,10 @@ export default function Prontuario(){
       });
       setSuccess('Evolução registrada com autoria, horário e vínculo clínico.');
       setMeasurements(emptyMeasurements);
-      await loadClinical({prefill:false});
+      setContent(emptyClinicalForm(context?.template));
+      setInherited([]);
+      setOriginId(null);
+      await loadClinical({prefill:false,preserveForm:true});
     }catch(e){setError(errMsg(e));}
   };
 
@@ -100,7 +103,7 @@ export default function Prontuario(){
       await api.post('/prontuario/paciente/'+pid+'/problemas',{descricao:problem});
       setProblem('');
       setSuccess('Problema clínico incluído na linha do tempo.');
-      await loadClinical({prefill:false});
+      await loadClinical({prefill:false,preserveForm:true});
     }catch(e){setError(errMsg(e));}
   };
 
@@ -108,7 +111,7 @@ export default function Prontuario(){
     try{
       await api.post('/prontuario/problemas/'+id+'/confirmar',{});
       setSuccess('Problema clínico confirmado com autoria e horário.');
-      await loadClinical({prefill:false});
+      await loadClinical({prefill:false,preserveForm:true});
     }catch(e){setError(errMsg(e));}
   };
 
@@ -117,7 +120,7 @@ export default function Prontuario(){
     try{
       await api.post('/prontuario/problemas/'+id+'/status',{status:'RESOLVIDO'});
       setSuccess('Problema clínico marcado como resolvido.');
-      await loadClinical({prefill:false});
+      await loadClinical({prefill:false,preserveForm:true});
     }catch(e){setError(errMsg(e));}
   };
 
