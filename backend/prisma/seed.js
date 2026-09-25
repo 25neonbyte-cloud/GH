@@ -172,6 +172,22 @@ async function ensureClinicalTemplates() {
       ]},
     },
     {
+      codigo: 'TRIAGEM_PADRAO',
+      nome: 'Triagem',
+      categoriaProfissional: 'TRIAGEM',
+      versao: 1,
+      schema: { fields: [
+        { key:'queixaPrincipal', label:'Queixa principal', type:'textarea', required:true },
+        { key:'origemAtendimento', label:'Origem / encaminhamento', type:'text', required:false },
+        { key:'classificacaoRisco', label:'Classificação / prioridade informada', type:'text', required:false },
+        { key:'precaucoesAtuais', label:'Precauções atuais', type:'text', required:false },
+        { key:'observacao', label:'Observações da triagem', type:'textarea', required:true },
+      ]},
+      interface: { sections:[
+        { title:'Triagem assistencial', fields:['queixaPrincipal','origemAtendimento','classificacaoRisco','precaucoesAtuais','observacao'] },
+      ]},
+    },
+    {
       codigo: 'MULTIPROFISSIONAL_PADRAO',
       nome: 'Evolução multiprofissional',
       categoriaProfissional: 'MULTIPROFISSIONAL',
@@ -195,8 +211,46 @@ async function ensureClinicalTemplates() {
   }
 }
 
+async function ensureDemoDepartments() {
+  const departments = await prisma.departamento.findMany();
+  if (!departments.length) return;
+  const byName = new Map(departments.map(d => [d.nome, d.id]));
+  const demoProfessionals = await prisma.profissional.findMany({
+    where: { updatedBy: { startsWith: 'seed-demo' } },
+  });
+
+  const choose = cargo => {
+    const c = String(cargo || '').toUpperCase();
+    if (c.includes('MEDICINA INTENSIVA')) return 'UTI';
+    if (c.includes('EMERGENCISTA')) return 'PRONTO SOCORRO - URGÊNCIA/EMERGÊNCIA';
+    if (c.includes('RADIOLOGIA')) return 'SADT/IMAGENS - RAIO X';
+    if (c.includes('ANESTESIOLOGIA') || c.includes('CIRURGIA')) return 'CENTRO CIRÚRGICO';
+    if (c.includes('ENFERMEIRO') || c.includes('TÉCNICO DE ENFERMAGEM')) return 'CLINICA MÉDICA';
+    if (c.includes('FISIOTERAPEUTA') || c.includes('BIOMÉDICO') || c.includes('ASSISTENTE SOCIAL')) return 'MULTIPROFISSIONAL';
+    if (c.includes('MAQUEIRO')) return 'PRONTO SOCORRO - URGÊNCIA/EMERGÊNCIA';
+    if (c.includes('ADMINISTRATIVO')) return 'GESTÃO DE PESSOAS/RH';
+    return 'MULTIPROFISSIONAL';
+  };
+
+  for (const professional of demoProfessionals) {
+    const departamentoId = professional.departamentoPrincipalId || byName.get(choose(professional.cargo));
+    if (!departamentoId) continue;
+    if (!professional.departamentoPrincipalId) {
+      await prisma.profissional.update({
+        where: { id: professional.id },
+        data: { departamentoPrincipalId: departamentoId },
+      });
+    }
+    await prisma.escala.updateMany({
+      where: { profissionalId: professional.id, departamentoId: null },
+      data: { departamentoId },
+    });
+  }
+}
+
 async function main() {
   await ensureClinicalTemplates();
+  await ensureDemoDepartments();
   await upsertUser({ username: 'admin', password: adminPassword, nome: 'Administrador', cargo: 'ADMINISTRATIVO', role: 'ADMIN', permissoes: {} });
 
   const marker = await prisma.logImportacao.findFirst({ where: { tipo: DEMO_MARKER } });
@@ -384,6 +438,7 @@ async function main() {
   }
 
   await linkDemoUsers();
+  await ensureDemoDepartments();
   await repairBedStatuses();
   await markDemoV3('fresh-seed');
 
