@@ -41,6 +41,8 @@ model Paciente {
   precaucoes       String[]
   internacoes      Internacao[]
   evolucoes        Evolucao[]
+  medicoesClinicas MedicaoClinica[]
+  problemasClinicos ProblemaClinico[]
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
   updatedBy        String?
@@ -123,6 +125,9 @@ model Internacao {
   createdBy             String
   dataAltaRegistrada    DateTime?
   altaBy                String?
+  evolucoes              Evolucao[]
+  medicoesClinicas       MedicaoClinica[]
+  problemasClinicos      ProblemaClinico[]
 
   @@index([pacienteId])
   @@index([leitoId])
@@ -136,23 +141,40 @@ enum StatusInternacao {
 }
 
 model Evolucao {
-  id             String       @id @default(uuid())
-  pacienteId     String
-  paciente       Paciente     @relation(fields: [pacienteId], references: [id])
-  sinaisVitais   Json?
-  queixas        String?
-  condutaMedica  String?
-  medicacoes     String?
-  observacoes    String
-  tipo           TipoEvolucao @default(ENFERMAGEM)
-  criadoPor      String
-  criadoPorNome  String
-  criadoPorCargo String
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  updatedBy      String?
+  id                String       @id @default(uuid())
+  pacienteId        String
+  paciente          Paciente     @relation(fields: [pacienteId], references: [id])
+  internacaoId      String?
+  internacao        Internacao?  @relation(fields: [internacaoId], references: [id], onDelete: SetNull)
+  profissionalId    String?
+  profissional      Profissional? @relation(fields: [profissionalId], references: [id], onDelete: SetNull)
+  templateId        String?
+  template          TemplateEvolucao? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  templateVersao    Int?
+  conteudo          Json?
+  evolucaoOrigemId  String?
+  evolucaoOrigem    Evolucao?    @relation("EvolucaoOrigem", fields: [evolucaoOrigemId], references: [id], onDelete: SetNull)
+  derivadas         Evolucao[]    @relation("EvolucaoOrigem")
+  camposHerdados    Json?
+  assinadaEm        DateTime?
+  sinaisVitais      Json?
+  queixas           String?
+  condutaMedica     String?
+  medicacoes        String?
+  observacoes       String
+  tipo              TipoEvolucao @default(ENFERMAGEM)
+  criadoPor         String
+  criadoPorNome     String
+  criadoPorCargo    String
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  updatedBy         String?
+  medicoesClinicas  MedicaoClinica[]
 
   @@index([pacienteId])
+  @@index([internacaoId])
+  @@index([profissionalId])
+  @@index([templateId])
   @@index([createdAt])
   @@map("evolucoes")
 }
@@ -172,6 +194,10 @@ model Profissional {
   usuarioId        String?  @unique
   usuario          Usuario? @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
   escalas          Escala[]
+  evolucoes        Evolucao[]
+  medicoesClinicas MedicaoClinica[]
+  problemasCriados ProblemaClinico[] @relation("ProblemaCriadoPor")
+  eventosProblema  ProblemaClinicoEvento[]
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
   updatedBy        String?
@@ -210,4 +236,85 @@ model LogImportacao {
   dataImportacao DateTime @default(now())
 
   @@map("logs_importacao")
+}
+
+model TemplateEvolucao {
+  id                    String     @id @default(uuid())
+  codigo                String
+  nome                  String
+  categoriaProfissional String
+  versao                Int        @default(1)
+  ativo                 Boolean    @default(true)
+  schema                Json
+  interface             Json?
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+  evolucoes             Evolucao[]
+
+  @@unique([codigo, versao])
+  @@index([categoriaProfissional, ativo])
+  @@map("templates_evolucao")
+}
+
+model MedicaoClinica {
+  id             String        @id @default(uuid())
+  pacienteId     String
+  paciente       Paciente      @relation(fields: [pacienteId], references: [id])
+  internacaoId   String?
+  internacao     Internacao?   @relation(fields: [internacaoId], references: [id], onDelete: SetNull)
+  evolucaoId     String?
+  evolucao       Evolucao?     @relation(fields: [evolucaoId], references: [id], onDelete: SetNull)
+  profissionalId String?
+  profissional   Profissional? @relation(fields: [profissionalId], references: [id], onDelete: SetNull)
+  codigo         String
+  valorNumerico  Float?
+  valorTexto     String?
+  unidade        String?
+  observadoEm    DateTime      @default(now())
+  criadoPor      String
+  createdAt      DateTime      @default(now())
+
+  @@index([pacienteId, codigo, observadoEm])
+  @@index([internacaoId])
+  @@index([evolucaoId])
+  @@map("medicoes_clinicas")
+}
+
+model ProblemaClinico {
+  id                    String        @id @default(uuid())
+  pacienteId            String
+  paciente              Paciente      @relation(fields: [pacienteId], references: [id])
+  internacaoId          String?
+  internacao            Internacao?   @relation(fields: [internacaoId], references: [id], onDelete: SetNull)
+  descricao             String
+  codigo                String?
+  status                String        @default("ATIVO")
+  iniciadoEm            DateTime      @default(now())
+  resolvidoEm           DateTime?
+  criadoPorProfissionalId String?
+  criadoPorProfissional Profissional? @relation("ProblemaCriadoPor", fields: [criadoPorProfissionalId], references: [id], onDelete: SetNull)
+  createdBy             String
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+  eventos               ProblemaClinicoEvento[]
+
+  @@index([pacienteId, status])
+  @@index([internacaoId])
+  @@map("problemas_clinicos")
+}
+
+model ProblemaClinicoEvento {
+  id             String        @id @default(uuid())
+  problemaId     String
+  problema       ProblemaClinico @relation(fields: [problemaId], references: [id], onDelete: Cascade)
+  tipo           String
+  valorAnterior  Json?
+  valorNovo      Json?
+  profissionalId String?
+  profissional   Profissional? @relation(fields: [profissionalId], references: [id], onDelete: SetNull)
+  criadoPor      String
+  ocorridoEm     DateTime      @default(now())
+
+  @@index([problemaId, ocorridoEm])
+  @@map("problemas_clinicos_eventos")
 }
